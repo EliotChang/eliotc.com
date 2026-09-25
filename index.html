@@ -1,48 +1,34 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-manifest="data/manifest.placeholder.json">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#111110">
+<meta name="theme-color" content="#0f0f0e">
 <title>Eliot Chang</title>
 <meta name="description" content="Designer working on interactive media that’s generated in real time.">
 <meta property="og:title" content="Eliot Chang">
 <meta property="og:description" content="Designer working on interactive media that’s generated in real time.">
 <meta property="og:url" content="https://eliotc.com">
+<link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Instrument+Sans:wght@400;500&display=swap" rel="stylesheet">
-<style>
-  * { box-sizing: border-box; }
-  html { background: #111110; -webkit-font-smoothing: antialiased; }
-  body {
-    margin: 0; min-height: 100vh; min-height: 100svh; background: #111110; color: #9e9d97;
-    font: 16px/1.65 "Instrument Sans", system-ui, sans-serif; letter-spacing: -0.005em;
-    display: grid; place-items: center; padding: 48px 24px;
-  }
-  main { max-width: 100%; }
-  h1 { margin: 0; font: 400 34px/1.1 "Instrument Serif", Georgia, serif; color: #efeee9; }
-  p { margin: 0; color: #efeee9; font-size: 17px; }
-  .prev { margin-top: 32px; }
-  .label { display: block; font-size: 13px; color: #6f6e69; margin-bottom: 4px; }
-  ul { list-style: none; margin: 0; padding: 0; }
-  li::before { content: "–"; color: #55544f; margin-right: 10px; }
-  nav { display: flex; gap: 24px; margin-top: 40px; font-size: 15px; }
-  a { color: #efeee9; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; text-decoration-color: rgba(239,238,233,.3); transition: text-decoration-color .2s; }
-  a:hover { text-decoration-color: rgba(239,238,233,.9); }
-  a:focus-visible { outline: 1px solid #efeee9; outline-offset: 3px; }
-  .in { opacity: 0; filter: blur(3px); transform: translateY(4px); animation: in .8s cubic-bezier(.2,.7,.2,1) forwards; }
-  .in:nth-child(2) { animation-delay: .1s; } .in:nth-child(3) { animation-delay: .2s; }
-  @keyframes in { to { opacity: 1; filter: none; transform: none; } }
-  @media (max-width: 480px) { br { display: none; } body { padding: 48px 16px; } }
-  @media (prefers-reduced-motion: reduce) { .in { animation: none; opacity: 1; filter: none; transform: none; } }
-</style>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preload" href="data/land.json" as="fetch" crossorigin>
+<link rel="stylesheet" href="atlas.css">
 </head>
 <body>
-<main>
-  <p class="in">Hi! I’m eliot, a designer working on<br> real-time generated interactive media.</p>
-  <div class="in prev">
+<canvas id="stage" aria-label="World map. Choose a place to play a short film about it." role="img"></canvas>
+<div class="videos" aria-hidden="true">
+  <video playsinline muted loop preload="none"></video>
+  <video playsinline muted loop preload="none"></video>
+</div>
+<div class="scrim" aria-hidden="true"></div>
+
+<section class="card" id="card" aria-label="About eliot" tabindex="-1">
+  <p class="intro">Hi! I’m eliot, a designer working on <span class="nw">real-time</span> generated interactive media.</p>
+  <p class="now">Currently working on: <a href="https://sonder.gg">sonder.gg</a></p>
+  <div class="prev">
     <span class="label">Previously</span>
     <ul>
       <li>a16z speedrun</li>
@@ -50,11 +36,30 @@
       <li>Kleiner Perkins Design Fellowship</li>
     </ul>
   </div>
-  <nav class="in">
+  <nav>
     <a href="https://docs.google.com/document/d/1Gn257Oo2Tdrnf8u51dKeGFQw_ZbxBJLO6IESc3gNT_4/edit">Resume</a>
     <a href="https://www.linkedin.com/in/eliot-chang/">LinkedIn</a>
     <a href="mailto:me@eliotc.com">Email</a>
   </nav>
-</main>
+</section>
+
+<button class="chip" id="chip" type="button" aria-controls="card" aria-expanded="true">eliot</button>
+
+<div class="controls" id="controls">
+  <button class="ctl" id="mute" type="button" aria-pressed="false">Unmute</button>
+  <button class="ctl" id="close" type="button">Close</button>
+</div>
+
+<div class="panel" id="panel" aria-live="polite">
+  <h2 class="p-name" id="p-name"></h2>
+  <p class="p-asof" id="p-asof"></p>
+  <p class="p-line" id="p-line"></p>
+  <p class="p-sources" id="p-sources"></p>
+</div>
+
+<p class="hint" id="hint">Choose any place on the map.</p>
+<div class="tip" id="tip" aria-hidden="true"></div>
+
+<script src="atlas.js" defer></script>
 </body>
 </html>
