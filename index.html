@@ -23,14 +23,17 @@
   }
   main { max-width: 100%; }
   h1 { margin: 0; font: 400 34px/1.1 "Instrument Serif", Georgia, serif; color: #efeee9; }
-  p { margin: 16px 0 0; }
-  h1 + p { margin-top: 24px; }
+  p { margin: 0; color: #efeee9; font-size: 17px; }
+  .prev { margin-top: 32px; }
+  .label { display: block; font-size: 13px; color: #6f6e69; margin-bottom: 4px; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li::before { content: "–"; color: #55544f; margin-right: 10px; }
   nav { display: flex; gap: 24px; margin-top: 40px; font-size: 15px; }
   a { color: #efeee9; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; text-decoration-color: rgba(239,238,233,.3); transition: text-decoration-color .2s; }
   a:hover { text-decoration-color: rgba(239,238,233,.9); }
   a:focus-visible { outline: 1px solid #efeee9; outline-offset: 3px; }
   .in { opacity: 0; filter: blur(3px); transform: translateY(4px); animation: in .8s cubic-bezier(.2,.7,.2,1) forwards; }
-  .in:nth-child(2) { animation-delay: .1s; } .in:nth-child(3) { animation-delay: .2s; } .in:nth-child(4) { animation-delay: .3s; }
+  .in:nth-child(2) { animation-delay: .1s; } .in:nth-child(3) { animation-delay: .2s; }
   @keyframes in { to { opacity: 1; filter: none; transform: none; } }
   @media (max-width: 480px) { br { display: none; } body { padding: 48px 16px; } }
   @media (prefers-reduced-motion: reduce) { .in { animation: none; opacity: 1; filter: none; transform: none; } }
@@ -38,9 +41,15 @@
 </head>
 <body>
 <main>
-  <h1 class="in">Eliot Chang</h1>
-  <p class="in">Designer working on interactive media<br> that’s generated in real time.</p>
-  <p class="in">Previously a16z speedrun, Fortnite and<br> the Kleiner Perkins Design Fellowship.</p>
+  <p class="in">Hi! I’m Eliot, a designer working on<br> real-time generated interactive media.</p>
+  <div class="in prev">
+    <span class="label">Previously</span>
+    <ul>
+      <li>a16z speedrun</li>
+      <li>Fortnite</li>
+      <li>Kleiner Perkins Design Fellowship</li>
+    </ul>
+  </div>
   <nav class="in">
     <a href="https://docs.google.com/document/d/1Gn257Oo2Tdrnf8u51dKeGFQw_ZbxBJLO6IESc3gNT_4/edit">Resume</a>
     <a href="https://www.linkedin.com/in/eliot-chang/">LinkedIn</a>
