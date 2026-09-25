@@ -3,47 +3,48 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#111110">
 <title>Eliot Chang</title>
-<meta name="description" content="I am a designer with a background in computer science and behavioral economics looking to make intuitive, beautiful, and fun products.">
+<meta name="description" content="Designer working on interactive media that’s generated in real time.">
 <meta property="og:title" content="Eliot Chang">
-<meta property="og:description" content="I am a designer with a background in computer science and behavioral economics looking to make intuitive, beautiful, and fun products.">
+<meta property="og:description" content="Designer working on interactive media that’s generated in real time.">
 <meta property="og:url" content="https://eliotc.com">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;1,6..72,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Instrument+Sans:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root { --bg: #f4f2ec; --ink: #1c1b19; --muted: #77746c; --rule: #d9d5cb; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #141312; --ink: #eceae3; --muted: #8f8b82; --rule: #2e2c29; }
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { height: 100%; }
+  * { box-sizing: border-box; }
+  html { background: #111110; -webkit-font-smoothing: antialiased; }
   body {
-    background: var(--bg); color: var(--ink);
-    font-family: "Newsreader", Georgia, serif;
-    font-size: 20px; line-height: 1.5;
-    display: flex; align-items: center;
-    padding: 0 24px;
-    -webkit-font-smoothing: antialiased;
+    margin: 0; min-height: 100vh; min-height: 100svh; background: #111110; color: #9e9d97;
+    font: 16px/1.65 "Instrument Sans", system-ui, sans-serif; letter-spacing: -0.005em;
+    display: grid; place-items: center; padding: 48px 24px;
   }
-  main { max-width: 480px; margin: 0 auto; width: 100%; }
-  h1 { font-weight: 400; font-size: 20px; }
-  p { color: var(--muted); margin-top: 4px; }
-  nav { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--rule); display: flex; gap: 24px; flex-wrap: wrap; }
-  a { color: var(--ink); text-decoration: none; }
-  a:hover { color: var(--muted); }
-  a:focus-visible { outline: 1px solid var(--ink); outline-offset: 4px; }
+  main { max-width: 100%; }
+  h1 { margin: 0; font: 400 34px/1.1 "Instrument Serif", Georgia, serif; color: #efeee9; }
+  p { margin: 16px 0 0; }
+  h1 + p { margin-top: 24px; }
+  nav { display: flex; gap: 24px; margin-top: 40px; font-size: 15px; }
+  a { color: #efeee9; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; text-decoration-color: rgba(239,238,233,.3); transition: text-decoration-color .2s; }
+  a:hover { text-decoration-color: rgba(239,238,233,.9); }
+  a:focus-visible { outline: 1px solid #efeee9; outline-offset: 3px; }
+  .in { opacity: 0; filter: blur(3px); transform: translateY(4px); animation: in .8s cubic-bezier(.2,.7,.2,1) forwards; }
+  .in:nth-child(2) { animation-delay: .1s; } .in:nth-child(3) { animation-delay: .2s; } .in:nth-child(4) { animation-delay: .3s; }
+  @keyframes in { to { opacity: 1; filter: none; transform: none; } }
+  @media (max-width: 480px) { br { display: none; } body { padding: 48px 16px; } }
+  @media (prefers-reduced-motion: reduce) { .in { animation: none; opacity: 1; filter: none; transform: none; } }
 </style>
 </head>
 <body>
 <main>
-  <h1>Eliot Chang</h1>
-  <p>I am a designer with a background in computer science and behavioral economics looking to make intuitive, beautiful, and fun products.</p>
-  <nav>
-    <a href="mailto:me@eliotc.com">Email</a>
+  <h1 class="in">Eliot Chang</h1>
+  <p class="in">Designer working on interactive media<br> that’s generated in real time.</p>
+  <p class="in">Previously a16z speedrun, Fortnite and<br> the Kleiner Perkins Design Fellowship.</p>
+  <nav class="in">
     <a href="https://docs.google.com/document/d/1Gn257Oo2Tdrnf8u51dKeGFQw_ZbxBJLO6IESc3gNT_4/edit">Resume</a>
     <a href="https://www.linkedin.com/in/eliot-chang/">LinkedIn</a>
-    <a href="https://eliotchang.medium.com/">Medium</a>
+    <a href="mailto:me@eliotc.com">Email</a>
   </nav>
 </main>
 </body>
