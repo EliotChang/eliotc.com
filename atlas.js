@@ -23,6 +23,7 @@
     border: "rgba(15,15,14,0.9)",
     pin: "#efeee9",
   };
+  const FINALE_ID = "__finale";
   const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   const params = new URLSearchParams(location.search);
@@ -34,7 +35,7 @@
   const els = {
     stage: $("#stage"), card: $("#card"), note: $("#note"), noteOpen: $("#note-open"), fold: $("#fold"),
     panel: $("#panel"), name: $("#p-name"), asof: $("#p-asof"), line: $("#p-line"), sources: $("#p-sources"),
-    music: $("#p-music"), prev: $("#prev"), next: $("#next"), thread: $("#thread"),
+    music: $("#p-music"), prev: $("#prev"), call: $("#call"), glint: $("#glint"), next: $("#next"), thread: $("#thread"),
     mute: $("#mute"), close: $("#close"), hint: $("#hint"), tip: $("#tip"),
   };
 
@@ -49,6 +50,8 @@
     landPath: null,
     raster: null,             // prefix-sum land raster for the card framing solver
     places: [], manifestBase: null, threads: new Map(), moment: "",
+    calls: [], featherPath: [], finale: null, edges: [],
+    watched: new Set(), drawn: new Set(), lineAnims: new Map(), route: null, glint: 0,
     pin: null, hot: null,
     mapDirty: true,
     pointer: { x: -1e4, y: -1e4, inside: false, type: "mouse" },
@@ -207,6 +210,159 @@
     if (t >= 1) S.anim = null;
   }
 
+  // ---------- memory: what this viewer has watched, and the lines it has earned ----------
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (_) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} },
+    del(k) { try { localStorage.removeItem(k); } catch (_) {} },
+  };
+  const KEY_W = "atlas-watched", KEY_D = "atlas-drawn";
+  if (params.get("reset") === "1") { store.del(KEY_W); store.del(KEY_D); }
+  for (const id of store.get(KEY_W) || []) if (typeof id === "string") S.watched.add(id);
+  for (const k of store.get(KEY_D) || []) if (typeof k === "string") S.drawn.add(k);
+
+  // Connections: places sharing a thread, the two ends of a call, consecutive feather stops.
+  function buildEdges(ids) {
+    const out = new Map();
+    const add = (a, b, kind) => {
+      if (!a || !b || a === b || !ids.has(a) || !ids.has(b)) return;
+      const [x, y] = a < b ? [a, b] : [b, a], key = `${kind}:${x}|${y}`;
+      if (!out.has(key)) out.set(key, { key, kind, a: x, b: y });
+    };
+    const byThread = new Map();
+    for (const p of S.places) for (const t of Array.isArray(p.threads) ? p.threads : []) {
+      if (!byThread.has(t)) byThread.set(t, []);
+      byThread.get(t).push(p.id);
+    }
+    for (const list of byThread.values()) for (let i = 0; i < list.length; i++) for (let k = i + 1; k < list.length; k++) add(list[i], list[k], "thread");
+    for (const c of S.calls) add(c.places[0], c.places[1], "call");
+    for (let i = 1; i < S.featherPath.length; i++) add(S.featherPath[i - 1], S.featherPath[i], "feather");
+    return [...out.values()];
+  }
+  const placeById = (id) => S.places.find((p) => p.id === id);
+  function markWatched(place) {
+    if (!place || S.watched.has(place.id) || !placeById(place.id)) return;
+    S.watched.add(place.id);
+    store.set(KEY_W, [...S.watched]);
+    S.mapDirty = true;
+  }
+  const edgeEarned = (e) => S.watched.has(e.a) && S.watched.has(e.b);
+  // New lines draw themselves slowly the first time the bare map is in view.
+  function startLineAnims(now) {
+    let i = 0;
+    for (const e of S.edges) {
+      if (!edgeEarned(e) || S.drawn.has(e.key) || S.lineAnims.has(e.key)) continue;
+      S.lineAnims.set(e.key, reduced() ? now - 1e5 : now + 500 + 700 * i++);
+    }
+  }
+  function stepLineAnims(now) {
+    let changed = false;
+    for (const [key, t0] of S.lineAnims) {
+      if (now - t0 >= LINE_MS) { S.lineAnims.delete(key); S.drawn.add(key); changed = true; }
+    }
+    if (changed) store.set(KEY_D, [...S.drawn]);
+  }
+  const LINE_MS = 2800;
+  const featherComplete = () => S.featherPath.length > 1 && S.featherPath.every((id) => placeById(id) && S.watched.has(id));
+
+  const LINE_STYLE = {
+    thread: { color: "rgba(226,196,158,0.34)", dash: [], bend: 0.14 },
+    call: { color: "rgba(160,192,226,0.34)", dash: [], bend: -0.14 },
+    feather: { color: "rgba(239,238,233,0.34)", dash: [3, 4], bend: 0 },
+  };
+  // A gentle arc between two places, taking the short way across the date line.
+  function edgePoints(a, b) {
+    const A = project(a.lng, a.lat), By = project(b.lng, b.lat).y;
+    const Bx = A.x + wrap180(b.lng - a.lng) * S.view.s;
+    return [A.x, A.y, Bx, By];
+  }
+  function strokeCurve(ax, ay, bx, by, bend, t0, t1) {
+    const mx = (ax + bx) / 2, my = (ay + by) / 2, dx = bx - ax, dy = by - ay;
+    const cx = mx - dy * bend, cy = my + dx * bend;
+    const n = 64, i0 = Math.floor(t0 * n), i1 = Math.ceil(t1 * n);
+    const pt = (t) => [(1 - t) * (1 - t) * ax + 2 * (1 - t) * t * cx + t * t * bx, (1 - t) * (1 - t) * ay + 2 * (1 - t) * t * cy + t * t * by];
+    mctx.beginPath();
+    for (let i = i0; i <= i1; i++) { const [x, y] = pt(clamp(i / n, t0, t1)); if (i === i0) mctx.moveTo(x, y); else mctx.lineTo(x, y); }
+    mctx.stroke();
+  }
+  function drawLines(now) {
+    const period = 360 * S.view.s;
+    const each = (e, fn) => {
+      const a = placeById(e.a), b = placeById(e.b);
+      if (!a || !b) return;
+      const [ax, ay, bx, by] = edgePoints(a, b);
+      for (let k = -2; k <= 2; k++) {
+        const o = k * period;
+        if (Math.max(ax, bx) + o < -20 || Math.min(ax, bx) + o > S.W + 20) continue;
+        fn(ax + o, ay, bx + o, by);
+      }
+    };
+    mctx.lineWidth = 0.8; mctx.lineCap = "round";
+    for (const e of S.edges) {
+      if (!edgeEarned(e)) continue;
+      let p = 0;
+      if (S.drawn.has(e.key)) p = 1;
+      else if (S.lineAnims.has(e.key)) p = easeInOut(clamp((now - S.lineAnims.get(e.key)) / LINE_MS, 0, 1));
+      if (p <= 0) continue;
+      const st = LINE_STYLE[e.kind];
+      mctx.strokeStyle = st.color; mctx.setLineDash(st.dash);
+      each(e, (ax, ay, bx, by) => strokeCurve(ax, ay, bx, by, st.bend, 0, p));
+    }
+    mctx.setLineDash([]);
+    // after the finale: the whole route draws itself once, brighter, then settles
+    if (S.route) {
+      const t = (now - S.route) / 1000, n = S.featherPath.length - 1, dur = Math.max(4, n * 0.9);
+      const fade = 1 - smooth(dur, dur + 2, t);
+      if (fade <= 0) { S.route = null; return; }
+      mctx.strokeStyle = `rgba(239,238,233,${0.75 * fade})`; mctx.lineWidth = 1.1;
+      for (let i = 0; i < n; i++) {
+        const p = clamp(t / dur * n - i, 0, 1);
+        if (p <= 0) break;
+        const a = placeById(S.featherPath[i]), b = placeById(S.featherPath[i + 1]);
+        each({ a: a.id, b: b.id }, (ax, ay, bx, by) => strokeCurve(ax, ay, bx, by, 0, 0, easeOut(p)));
+      }
+    }
+  }
+
+  // A direction from the pipeline ("right", "east", "up", degrees...) as a unit screen vector.
+  function dirVec(d) {
+    if (typeof d === "number" && Number.isFinite(d)) return { x: Math.cos(d * RAD), y: -Math.sin(d * RAD) };
+    const s = typeof d === "string" ? d.toLowerCase() : "";
+    const x = /right|east|l-?r/.test(s) ? 1 : /left|west|r-?l/.test(s) ? -1 : 0;
+    const y = /down|south|bottom/.test(s) ? 1 : /up|north|top/.test(s) ? -1 : 0;
+    return x || y ? { x, y } : null;
+  }
+  // The travel direction between two consecutive feather stops, or null.
+  function featherDir(from, to) {
+    if (!from || !to) return null;
+    const i = S.featherPath.indexOf(from.id), k = S.featherPath.indexOf(to.id);
+    if (i < 0 || k < 0 || Math.abs(i - k) !== 1) return null;
+    const ff = from.feather || {}, tf = to.feather || {};
+    if (k > i) return dirVec(ff.exit) || dirVec(tf.enter);
+    const back = dirVec(ff.enter) || dirVec(tf.exit);
+    return back && { x: -back.x, y: -back.y };
+  }
+  // When a shot plays: {start, end} given directly, via place.shots[n], or the nth caption.
+  function shotWindow(place, shot) {
+    if (shot && typeof shot === "object") {
+      const s = +(shot.start ?? shot.t ?? shot.time);
+      return Number.isFinite(s) ? { start: s, end: Number.isFinite(+shot.end) ? +shot.end : s + 5 } : null;
+    }
+    if (typeof shot !== "number" || !Number.isFinite(shot)) return null;
+    if (!Number.isInteger(shot)) return { start: shot, end: shot + 5 };
+    const src = (Array.isArray(place.shots) && place.shots[shot]) || (Array.isArray(place.captions) && place.captions[shot]);
+    if (src && Number.isFinite(+src.start)) return { start: +src.start, end: Number.isFinite(+src.end) ? +src.end : +src.start + 5 };
+    return { start: shot * 5, end: shot * 5 + 5 };
+  }
+  function callOf(place) {
+    const c = place && place.call;
+    if (!c || typeof c !== "object") return null;
+    let other = c.with && placeById(c.with);
+    if (!other && c.id) { const top = S.calls.find((x) => x.id === c.id); if (top) other = placeById(top.places.find((id) => id !== place.id)); }
+    const win = shotWindow(place, c.shot);
+    return other && win ? { other, win } : null;
+  }
+
   // ---------- map canvas ----------
   const mapCv = document.createElement("canvas");
   const mctx = mapCv.getContext("2d");
@@ -238,12 +394,13 @@
       mctx.stroke(S.landPath);
     }
     mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawLines(performance.now());
     const period = 360 * v.s;
     const copies = (q, pad, fn) => {
       for (let x = q.x - period * Math.ceil(q.x / period); x < W + pad; x += period) if (x > -pad) fn(x, q.y);
     };
     for (const p of S.places) {
-      const isPin = S.pin && p.id === S.pin.id, isHot = S.hot && p.id === S.hot.id;
+      const isPin = S.pin && p.id === S.pin.id, isHot = S.hot && p.id === S.hot.id, watched = S.watched.has(p.id);
       copies(project(p.lng, p.lat), 24, (x, y) => {
         if (isPin) {
           mctx.fillStyle = COLORS.pin;
@@ -258,6 +415,9 @@
         if (isHot) {
           mctx.strokeStyle = "rgba(239,238,233,0.4)"; mctx.lineWidth = 1;
           mctx.beginPath(); mctx.arc(x, y, 7, 0, Math.PI * 2); mctx.stroke();
+        } else if (watched) {
+          mctx.strokeStyle = "rgba(239,238,233,0.22)"; mctx.lineWidth = 0.8;
+          mctx.beginPath(); mctx.arc(x, y, 4.5, 0, Math.PI * 2); mctx.stroke();
         }
       });
     }
@@ -403,6 +563,7 @@ void main() {
     }
     slot.place = place; slot.hasContent = false; slot.tainted = false; slot.failed = false; slot.lastT = -1;
     const el = slot.el;
+    el.loop = place.id !== FINALE_ID;
     el.crossOrigin = "anonymous";
     el.muted = S.muted;
     el.preload = "auto";
@@ -482,6 +643,12 @@ void main() {
     });
   }
   const otherSlot = (slot) => (slot === slots[0] ? slots[1] : slots[0]);
+  for (const el of videoEls) {
+    el.addEventListener("ended", () => {
+      const slot = slotOf(el);
+      if (slot && slot === S.cur && slot.place && slot.place.id === FINALE_ID) { S.routePending = true; closeVideo(); }
+    });
+  }
 
   function wantPreview(place) {
     clearTimeout(preview.idleTimer); preview.idleTimer = 0;
@@ -556,6 +723,8 @@ void main() {
       S.ripple = reduced() ? null : { x, y, t0: performance.now() };
       return;
     }
+    const fromPlace = (S.next || S.cur || {}).place;
+    document.body.classList.toggle("is-finale", place.id === FINALE_ID);
     S.pin = place; S.hot = null; S.mapDirty = true;
     S.ripple = reduced() || opt.fromLens ? null : { x, y, t0: performance.now() };
     const slot = S.next || (S.cur ? otherSlot(S.cur) : slots[0]);
@@ -578,15 +747,46 @@ void main() {
     S.next = slot;
     S.surf = { cur: null, old: null, t0: 0 };
     S.hole.r = 0; S.hole.holdUntil = performance.now() + (reduced() ? 0 : 1300);
-    S.reveal = { x, y, t0: 0, r0, f0, rMax: Math.hypot(Math.max(x, S.W - x), Math.max(y, S.H - y)) + 80 };
+    // Feather relay: the next stop arrives from the side the last one left by, sliding in.
+    const fd = !f0 && featherDir(fromPlace, place);
+    let slide = null;
+    if (fd) {
+      x = S.W * (0.5 + 0.5 * fd.x); y = S.H * (0.5 + 0.5 * fd.y);
+      const full = coverFrame(16 / 9);
+      f0 = { x: full.x + fd.x * S.W * 0.12, y: full.y + fd.y * S.H * 0.12, h: full.h };
+      slide = { x: -fd.x * S.W * 0.06, y: -fd.y * S.H * 0.06 };
+      S.ripple = null;
+    }
+    S.reveal = { x, y, t0: 0, r0, f0, slide, rMax: Math.hypot(Math.max(x, S.W - x), Math.max(y, S.H - y)) + 80 };
     showPanel(place);
     document.body.classList.add("is-playing");
     updateHint();
   }
 
+  // ---------- the ending ----------
+  const lastStop = () => placeById(S.featherPath[S.featherPath.length - 1]);
+  function playFinale() {
+    const last = lastStop();
+    if (!S.finale || !last) return;
+    S.glint = 0; els.glint.classList.remove("is-on");
+    const pl = { id: FINALE_ID, name: "", country: "", lat: last.lat, lng: last.lng, video: S.finale.video, poster: S.finale.poster || last.poster, captions: [], sources: [] };
+    const q = screenOf(last, S.W / 2);
+    select(pl, q.x, q.y);
+  }
+  function stepGlint(now) {
+    const last = lastStop();
+    if (!S.glint && S.finale && last && !playing() && !S.closing && !S.cardOpen && !S.down && now - S.lastMove > 3500 && featherComplete()) S.glint = now;
+    const show = S.glint && !playing() && !S.closing && last;
+    if (show) {
+      const q = screenOf(last, S.W / 2);
+      els.glint.style.transform = `translate(${q.x}px, ${q.y}px)`;
+    }
+    els.glint.classList.toggle("is-on", !!show);
+  }
+
   function flip(dir) {
     const from = (S.next || S.cur || {}).place;
-    if (!from || S.closing) return;
+    if (!from || S.closing || from.id === FINALE_ID) return;
     go(neighbor(from, dir));
   }
   // Jump to a place from the keyboard or the caption: pan the (hidden) map if it is off-screen,
@@ -618,7 +818,8 @@ void main() {
     if (S.closing) unloadSlot(S.closing.slot);
     S.closing = null;
     S.pin = null; S.mapDirty = true;
-    document.body.classList.remove("is-playing");
+    document.body.classList.remove("is-playing", "is-finale");
+    if (S.routePending) { S.routePending = false; S.route = performance.now() + 600; S.lastMove = performance.now() + 8000; }
     if (S.panAfterReveal) { S.panAfterReveal = false; setView(worldView(), true); }
     updateHint();
   }
@@ -664,6 +865,9 @@ void main() {
     els.prev.hidden = !w; els.next.hidden = !e;
     if (w) { els.prev.querySelector(".nav-name").textContent = w.name; els.prev.setAttribute("aria-label", `West to ${w.name}`); }
     if (e) { els.next.querySelector(".nav-name").textContent = e.name; els.next.setAttribute("aria-label", `East to ${e.name}`); }
+    const call = callOf(place);
+    els.call.hidden = !call; els.call.classList.remove("is-on");
+    if (call) { els.call.querySelector(".nav-name").textContent = call.other.name; els.call.dataset.target = call.other.id; els.call.setAttribute("aria-label", `Over to ${call.other.name}`); }
     // Threads: a tiny tag that jumps to the next place (eastward) on the same story.
     els.thread.hidden = true; els.thread.dataset.target = "";
     for (const th of placeThreads(place)) {
@@ -799,6 +1003,8 @@ void main() {
   els.prev.addEventListener("click", () => flip(-1));
   els.next.addEventListener("click", () => flip(1));
   els.thread.addEventListener("click", () => go(S.places.find((p) => p.id === els.thread.dataset.target)));
+  els.call.addEventListener("click", () => go(placeById(els.call.dataset.target)));
+  els.glint.addEventListener("click", playFinale);
   els.mute.addEventListener("click", () => {
     S.muted = !S.muted;
     try { localStorage.setItem("atlas-sound", S.muted ? "off" : "on"); } catch (_) {}
@@ -974,6 +1180,18 @@ void main() {
     if (lensOn && Math.hypot(H.x - lastPreload.x, H.y - lastPreload.y) > 40) { lastPreload = { x: H.x, y: H.y }; preloadNear(H.x, H.y); }
 
     if (S.ripple && (now - S.ripple.t0) > 1800) S.ripple = null;
+    // memory: a film counts as watched past 60%; earned lines draw when the map is in view
+    const cs = S.cur;
+    if (cs && cs.place && cs.place.id !== FINALE_ID && !S.closing) {
+      const dur = cs.el.duration || cs.place.durationS;
+      if (dur && cs.el.currentTime / dur >= 0.6) markWatched(cs.place);
+      const call = callOf(cs.place), t = cs.el.currentTime;
+      els.call.classList.toggle("is-on", !!call && !S.next && t >= call.win.start && t < call.win.end);
+    }
+    if (!film && !S.closing && S.edges.length) startLineAnims(now);
+    stepLineAnims(now);
+    if (S.lineAnims.size || S.route) S.mapDirty = true;
+    stepGlint(now);
     updateCaption();
     updateLabel(lensOn && H.r > 8 && H.idle < 0.5);
 
@@ -1000,6 +1218,7 @@ void main() {
       }
     }
     const pf = prev ? coverFrame(prev.asp) : { x: 0, y: 0, h: 1 };
+    if (prev && S.reveal && S.reveal.slide) { pf.x += S.reveal.slide.x * revealE; pf.y += S.reveal.slide.y * revealE; }
     const sf = S.surf, A = sf.old, B = sf.cur;
     const bind = (unit, tex) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tex || blankTex); };
     bind(0, mapTex);
@@ -1028,16 +1247,35 @@ void main() {
   }
 
   // ---------- boot ----------
-  async function loadManifest() {
-    const url = params.get("manifest") || document.documentElement.dataset.manifest;
+  // v2 (when present) is laid over v1 place by place, so a partially published v2 never
+  // hides the rest of the world. ?manifest= loads exactly one file (fixtures, tests).
+  async function fetchManifest(url) {
     const abs = new URL(url, location.href);
     const res = await fetch(abs);
     if (!res.ok) throw new Error(`manifest ${res.status}`);
     const m = await res.json();
-    S.manifestBase = new URL(m.cdn || "./", abs).href;
-    S.places = (m.places || []).filter((p) => p && p.video && Number.isFinite(p.lat) && Number.isFinite(p.lng));
+    const base = new URL(m.cdn || "./", abs).href;
+    const places = (Array.isArray(m.places) ? m.places : []).filter((p) => p && p.id && p.video && Number.isFinite(p.lat) && Number.isFinite(p.lng))
+      .map((p) => ({ ...p, video: new URL(p.video, base).href, poster: p.poster ? new URL(p.poster, base).href : "" }));
+    return { m, base, places };
+  }
+  async function loadManifest() {
+    const ds = document.documentElement.dataset;
+    const urls = params.get("manifest") ? [params.get("manifest")] : [ds.manifestV2, ds.manifest].filter(Boolean);
+    const got = (await Promise.allSettled(urls.map(fetchManifest))).filter((r) => r.status === "fulfilled").map((r) => r.value);
+    if (!got.length) throw new Error("no manifest");
+    S.manifestBase = got[got.length - 1].base;
+    const byId = new Map();
+    for (const g of got.slice().reverse()) for (const p of g.places) byId.set(p.id, p); // later (v2) wins
+    S.places = [...byId.values()];
+    const m = got[0].m, finaleBase = got[0].base;
     S.moment = momentLabel(m.moment);
     if (Array.isArray(m.threads)) for (const t of m.threads) if (t && t.id && t.title) S.threads.set(t.id, t);
+    const ids = new Set(S.places.map((p) => p.id));
+    S.calls = (Array.isArray(m.calls) ? m.calls : []).filter((c) => c && Array.isArray(c.places) && c.places.length === 2);
+    S.featherPath = m.feather && Array.isArray(m.feather.path) ? m.feather.path.filter((id) => typeof id === "string") : [];
+    S.finale = m.finale && m.finale.video ? { ...m.finale, video: new URL(m.finale.video, finaleBase).href, poster: m.finale.poster ? new URL(m.finale.poster, finaleBase).href : "" } : null;
+    S.edges = buildEdges(ids);
   }
 
   async function boot() {
@@ -1062,6 +1300,7 @@ void main() {
     if (manRes.status === "rejected") console.warn("atlas: manifest failed to load", manRes.reason);
     await fontsReady;
 
+    if (params.get("unlock") === "1") { for (const id of S.featherPath) if (placeById(id)) S.watched.add(id); store.set(KEY_W, [...S.watched]); }
     const debugPlace = params.get("place") && S.places.find((p) => p.id === params.get("place"));
     if (params.get("card") === "min" || debugPlace) {
       minimizeCard(false);
@@ -1091,7 +1330,7 @@ void main() {
 
   // Debug surface for verification scripts.
   window.__atlas = {
-    state: S, project, unproject, ym, latFromYm, cardView, worldView, screenOf, pickAt, preview, slots,
+    state: S, markWatched, placeById, playFinale, project, unproject, ym, latFromYm, cardView, worldView, screenOf, pickAt, preview, slots,
     cardRect: () => els.card.getBoundingClientRect(),
   };
 

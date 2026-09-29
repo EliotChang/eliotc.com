@@ -180,6 +180,21 @@ button { font: inherit; letter-spacing: inherit; }
 }
 .thread:hover { border-color: rgba(239, 238, 233, 0.4); }
 
+/* The call: offered only while its shot plays. */
+.call { opacity: 0; pointer-events: none; transition: opacity 0.9s var(--ease); }
+.call.is-on { opacity: 1; pointer-events: auto; }
+.is-finale .panel { display: none; }
+/* The ending: one feather at the end of the route. */
+.glint {
+  position: fixed; z-index: 4; left: 0; top: 0; width: 36px; height: 36px; margin: -27px 0 0 -11px; padding: 7px;
+  border: 0; background: none; color: #f4f1e8; cursor: pointer;
+  filter: drop-shadow(0 0 6px rgba(244, 241, 232, 0.55));
+  opacity: 0; visibility: hidden; transition: opacity 1.8s var(--ease), visibility 0s 1.8s;
+}
+.glint.is-on { opacity: 1; visibility: visible; transition-delay: 0s; animation: glint 3.2s ease-in-out infinite 1.8s; }
+.glint:focus-visible { outline: 1px solid var(--on-dark); outline-offset: 2px; border-radius: 4px; }
+@keyframes glint { 50% { opacity: 0.55; filter: drop-shadow(0 0 2px rgba(244, 241, 232, 0.3)); } }
+
 /* Map hint + lens label */
 .hint {
   position: fixed; z-index: 4; left: var(--gutter); bottom: var(--gutter); margin: 0;
@@ -204,6 +219,7 @@ button { font: inherit; letter-spacing: inherit; }
   .p-line { font-size: 15px; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .glint.is-on { animation: none; }
   .card, .card.is-min, .panel, #stage { transition-property: opacity, visibility; transform: translate(-50%, -50%); }
   .panel, #stage { transform: none; }
 }

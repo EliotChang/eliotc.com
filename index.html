@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-manifest="https://d3h06xb32ojj4n.cloudfront.net/eliotc/atlas/manifest.json">
+<html lang="en" data-manifest="https://d3h06xb32ojj4n.cloudfront.net/eliotc/atlas/manifest.json" data-manifest-v2="https://d3h06xb32ojj4n.cloudfront.net/eliotc/atlas/manifest-v2.json">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -65,10 +65,12 @@
   <div class="p-nav" id="p-nav">
     <button class="nav" id="prev" type="button" aria-keyshortcuts="ArrowLeft"><span aria-hidden="true">←</span> <span class="nav-name"></span></button>
     <button class="nav" id="next" type="button" aria-keyshortcuts="ArrowRight"><span class="nav-name"></span> <span aria-hidden="true">→</span></button>
+    <button class="nav call" id="call" type="button" hidden><span aria-hidden="true">→</span> <span class="nav-name"></span></button>
     <button class="nav thread" id="thread" type="button" hidden></button>
   </div>
 </div>
 
+<button class="glint" id="glint" type="button" aria-label="A feather" tabindex="-1"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M20.5 3.5c-6.2.4-11 4.6-12.6 11.3l-.6 2.6 2.4-.9c5.8-2.2 9.6-6.9 10.8-13z" fill="currentColor" opacity=".9"/><path d="M19 5 5.2 18.8M4 20l1.2-1.2" stroke="currentColor" stroke-width="1" stroke-linecap="round" fill="none"/></svg></button>
 <p class="hint" id="hint">Choose any place on the map.</p>
 <div class="tip" id="tip" aria-hidden="true"></div>
 
