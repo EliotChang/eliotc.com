@@ -1,6 +1,7 @@
 // eliotc.com atlas: a quiet world map; each place plays a short film.
-// Map: Miller cylindrical (invertible, wraps horizontally). One WebGL canvas composites
-// the map (bottom) and the playing video (top); a cursor circle cuts through to the map.
+// Map: Miller cylindrical (invertible, wraps horizontally). One WebGL canvas composites the
+// map, the playing film, and a water-like lens that follows the cursor. On the bare map the
+// lens surfaces the nearest place's film; during a film it opens a window onto the map.
 (() => {
   "use strict";
 
@@ -13,12 +14,13 @@
   const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
   const easeOut = (t) => 1 - Math.pow(1 - t, 3);
   const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  const approach = (cur, to, dt, tau) => cur + (to - cur) * (1 - Math.exp(-dt / tau));
 
   const COLORS = {
     ocean: "#0f0f0e",
-    land: "#1f1f1d",
-    border: "rgba(15,15,14,0.85)",
-    dot: "rgba(239,238,233,0.42)",
+    land: "#272725",
+    border: "rgba(15,15,14,0.9)",
     pin: "#efeee9",
   };
   const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -26,11 +28,13 @@
   const params = new URLSearchParams(location.search);
   const mqReduced = matchMedia("(prefers-reduced-motion: reduce)");
   const mqCoarse = matchMedia("(pointer: coarse)");
+  const mqNarrow = matchMedia("(max-width: 899px)");
   const $ = (s) => document.querySelector(s);
 
   const els = {
-    stage: $("#stage"), card: $("#card"), chip: $("#chip"), panel: $("#panel"),
-    name: $("#p-name"), asof: $("#p-asof"), line: $("#p-line"), sources: $("#p-sources"),
+    stage: $("#stage"), card: $("#card"), note: $("#note"), noteOpen: $("#note-open"), fold: $("#fold"),
+    panel: $("#panel"), name: $("#p-name"), asof: $("#p-asof"), line: $("#p-line"), sources: $("#p-sources"),
+    music: $("#p-music"), prev: $("#prev"), next: $("#next"), thread: $("#thread"),
     mute: $("#mute"), close: $("#close"), hint: $("#hint"), tip: $("#tip"),
   };
 
@@ -44,22 +48,28 @@
     panAfterReveal: false,
     landPath: null,
     raster: null,             // prefix-sum land raster for the card framing solver
-    places: [], manifestBase: null,
-    pin: null,
+    places: [], manifestBase: null, threads: new Map(), moment: "",
+    pin: null, hot: null,
     mapDirty: true,
     pointer: { x: -1e4, y: -1e4, inside: false, type: "mouse" },
+    lastMove: 0,
     down: null,
-    hole: { x: 0, y: 0, r: 0, vx: 0, vy: 0, hideAt: 0 },
+    // The lens. r: drawn radius; idle: 0 = full lens, 1 = resting as a faint ring.
+    hole: { x: 0, y: 0, r: 0, vx: 0, vy: 0, hideAt: 0, idle: 0, swell: 0, holdUntil: 0 },
+    // What the lens surfaces: cur fades/ripples in over old.
+    surf: { cur: null, old: null, t0: 0 },
     ripple: null,             // { x, y, t0 }
     cur: null, next: null,    // video slots
-    reveal: null,             // { x, y, t0, rMax }
+    reveal: null,             // { x, y, t0, rMax, r0, f0 }
     closing: null,            // { x, y, t0, rMax, slot }
-    muted: true,
+    muted: (() => { try { return localStorage.getItem("atlas-sound") !== "on"; } catch (_) { return true; } })(),
     started: false,
     posterCache: new Map(),
     lastT: performance.now(),
   };
   const reduced = () => mqReduced.matches;
+  const playing = () => !!(S.cur || S.next) && !S.closing;
+  const lensR = () => (playing() ? (S.W < 560 ? 72 : 80) : (S.W < 560 ? 92 : 110));
 
   // ---------- projection ----------
   function project(lng, lat, v = S.view) {
@@ -200,6 +210,17 @@
   // ---------- map canvas ----------
   const mapCv = document.createElement("canvas");
   const mctx = mapCv.getContext("2d");
+  // A soft glow sprite for "a film lives here" dots.
+  const glowCv = document.createElement("canvas");
+  (() => {
+    const n = 48; glowCv.width = glowCv.height = n;
+    const g = glowCv.getContext("2d");
+    const grad = g.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
+    grad.addColorStop(0, "rgba(239,238,233,0.30)");
+    grad.addColorStop(0.35, "rgba(239,238,233,0.10)");
+    grad.addColorStop(1, "rgba(239,238,233,0)");
+    g.fillStyle = grad; g.fillRect(0, 0, n, n);
+  })();
   function drawMap() {
     const { W, H, dpr, view: v } = S;
     mctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -218,24 +239,27 @@
     }
     mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const period = 360 * v.s;
-    mctx.fillStyle = COLORS.dot;
+    const copies = (q, pad, fn) => {
+      for (let x = q.x - period * Math.ceil(q.x / period); x < W + pad; x += period) if (x > -pad) fn(x, q.y);
+    };
     for (const p of S.places) {
-      if (S.pin && p.id === S.pin.id) continue;
-      const q = project(p.lng, p.lat);
-      for (let x = q.x - period * Math.ceil(q.x / period); x < W + 4; x += period) {
-        if (x < -4) continue;
-        mctx.beginPath(); mctx.arc(x, q.y, 1.8, 0, Math.PI * 2); mctx.fill();
-      }
-    }
-    if (S.pin) {
-      const q = project(S.pin.lng, S.pin.lat);
-      for (let x = q.x - period * Math.ceil(q.x / period); x < W + 12; x += period) {
-        if (x < -12) continue;
-        mctx.fillStyle = COLORS.pin;
-        mctx.beginPath(); mctx.arc(x, q.y, 3.5, 0, Math.PI * 2); mctx.fill();
-        mctx.strokeStyle = "rgba(239,238,233,0.45)"; mctx.lineWidth = 1;
-        mctx.beginPath(); mctx.arc(x, q.y, 9, 0, Math.PI * 2); mctx.stroke();
-      }
+      const isPin = S.pin && p.id === S.pin.id, isHot = S.hot && p.id === S.hot.id;
+      copies(project(p.lng, p.lat), 24, (x, y) => {
+        if (isPin) {
+          mctx.fillStyle = COLORS.pin;
+          mctx.beginPath(); mctx.arc(x, y, 3.5, 0, Math.PI * 2); mctx.fill();
+          mctx.strokeStyle = "rgba(239,238,233,0.45)"; mctx.lineWidth = 1;
+          mctx.beginPath(); mctx.arc(x, y, 9, 0, Math.PI * 2); mctx.stroke();
+          return;
+        }
+        mctx.drawImage(glowCv, x - 12, y - 12, 24, 24);
+        mctx.fillStyle = isHot ? "rgba(239,238,233,0.95)" : "rgba(239,238,233,0.6)";
+        mctx.beginPath(); mctx.arc(x, y, isHot ? 2.4 : 1.8, 0, Math.PI * 2); mctx.fill();
+        if (isHot) {
+          mctx.strokeStyle = "rgba(239,238,233,0.4)"; mctx.lineWidth = 1;
+          mctx.beginPath(); mctx.arc(x, y, 7, 0, Math.PI * 2); mctx.stroke();
+        }
+      });
     }
   }
 
@@ -243,23 +267,20 @@
   const VS = `attribute vec2 a; void main(){ gl_Position = vec4(a, 0.0, 1.0); }`;
   const FS = `
 precision highp float;
-uniform sampler2D uMap, uPrev, uNext;
-uniform vec2 uRes;
-uniform float uDpr, uTime, uMotion, uPrevAsp, uNextAsp, uHasPrev, uHasNext;
-uniform vec3 uReveal, uHole, uRipple;
-uniform vec2 uVel;
-vec2 cover(vec2 uv, float asp) {
-  float A = uRes.x / uRes.y;
-  vec2 s = A > asp ? vec2(1.0, asp / A) : vec2(A / asp, 1.0);
-  return (uv - 0.5) * s + 0.5;
-}
+uniform sampler2D uMap, uPrev, uNext, uSA, uSAv, uSB, uSBv;
+uniform vec2 uRes, uVel;
+uniform float uDpr, uTime, uMotion, uPrevAsp, uNextAsp, uHasPrev, uHasNext, uFilm, uIdle;
+uniform vec3 uPrevF, uNextF, uReveal, uHole, uRipple, uSurf;
+uniform vec4 uA, uB;
+// A film laid out as a rect of height F.z px centred on F.xy.
+vec2 frameUV(vec2 p, vec3 F, float asp) { return vec2((p.x - F.x) / (F.z * asp), (p.y - F.y) / F.z) + 0.5; }
 float wob(vec2 d, float t, float amp) {
   float a = atan(d.y, d.x);
   return amp * (0.5 * sin(3.0 * a + 1.1 * t) + 0.3 * sin(5.0 * a - 1.7 * t + 1.3) + 0.2 * sin(9.0 * a + 2.3 * t + 4.0));
 }
+float line(float d, float w) { return exp(-(d * d) / (2.0 * w * w)); }
 void main() {
   vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
-  vec2 uv = p / uRes;
   float f = 1.2 * uDpr;
 
   // click ripple: a travelling ring that refracts whatever is under it
@@ -272,41 +293,55 @@ void main() {
     disp = d / max(r, 1.0) * prof * 9.0 * uDpr * sin(k * 2.6);
     glow = prof;
   }
-  vec2 muv = uv + disp / uRes;
+  vec2 mp = p + disp;
+  vec3 mapC = texture2D(uMap, mp / uRes).rgb;
 
-  // cursor hole with a water-like, velocity-driven edge
-  float holeM = 0.0, rim = 0.0, hs = 1e4;
-  vec2 hn = vec2(0.0);
-  if (uHole.z > 0.5) {
-    vec2 hd = p - uHole.xy; float hr = length(hd); hn = hd / max(hr, 1.0);
-    float vm = length(uVel);
-    float amp = (2.0 * uDpr + min(vm * 0.45, 16.0 * uDpr)) * uMotion;
-    float bulge = vm > 0.01 ? dot(hn, uVel / vm) * min(vm * 0.6, 20.0 * uDpr) * uMotion : 0.0;
-    hs = hr - (uHole.z + wob(hd, uTime * 1.7, amp) + bulge);
-    holeM = 1.0 - smoothstep(-f, f, hs);
-    rim = smoothstep(-30.0 * uDpr, 0.0, hs) * holeM;
-  }
-  vec3 mapC = texture2D(uMap, muv).rgb;
-  vec3 mapL = texture2D(uMap, muv - hn * rim * rim * 14.0 * uDpr / uRes).rgb;
-
-  vec3 top = uHasPrev > 0.5 ? texture2D(uPrev, cover(muv, uPrevAsp)).rgb : mapC;
+  // base: the map, or the film (with a new film blooming open inside the reveal circle)
+  vec3 base = uHasPrev > 0.5 ? texture2D(uPrev, frameUV(mp, uPrevF, uPrevAsp)).rgb : mapC;
   if (uHasNext > 0.5) {
     vec2 rd = p - uReveal.xy;
     float rs = length(rd) - (uReveal.z + wob(rd, uTime * 1.3, 6.0 * uDpr * uMotion));
     float rm = 1.0 - smoothstep(-1.5 * f, 1.5 * f, rs);
-    vec3 nx = texture2D(uNext, cover(muv, uNextAsp)).rgb;
-    float edge = exp(-(rs * rs) / (2.0 * pow(3.0 * uDpr, 2.0))) * step(1.0, uReveal.z);
-    top = mix(top, nx, rm) + edge * 0.06;
+    vec3 nx = texture2D(uNext, frameUV(mp, uNextF, uNextAsp)).rgb;
+    base = mix(base, nx, rm) + line(rs, 3.0 * uDpr) * step(1.0, uReveal.z) * 0.06;
   }
-  float shade = uHole.z > 0.5 ? (1.0 - smoothstep(0.0, 22.0 * uDpr, hs)) * (1.0 - holeM) : 0.0;
-  top *= 1.0 - 0.3 * shade;
-  vec3 col = mix(top, mapL, holeM);
-  col += (uHole.z > 0.5 ? exp(-(hs * hs) / (2.0 * pow(1.1 * uDpr, 2.0))) : 0.0) * 0.12;
+  vec3 col = base;
+
+  // the lens
+  if (uHole.z > 0.5) {
+    vec2 hd = p - uHole.xy; float hr = length(hd); vec2 hn = hd / max(hr, 1.0);
+    float vm = length(uVel);
+    float amp = (1.5 * uDpr + min(vm * 0.4, 14.0 * uDpr)) * uMotion;
+    float bulge = vm > 0.01 ? dot(hn, uVel / vm) * min(vm * 0.5, 16.0 * uDpr) * uMotion : 0.0;
+    float hs = hr - (uHole.z + wob(hd, uTime * 1.7, amp) + bulge);
+    float lm = (1.0 - smoothstep(-f, f, hs)) * (1.0 - uIdle);
+    float rim = smoothstep(-26.0 * uDpr, 0.0, hs) * (1.0 - smoothstep(-f, f, hs));
+    // swap ripple: a ring running outward from the centre refracts the lens contents
+    float rk = (hr - uSurf.y) / (16.0 * uDpr);
+    vec2 lp = p - hn * rim * rim * 14.0 * uDpr + hn * exp(-rk * rk) * uSurf.z * 7.0 * uDpr * uMotion;
+    vec3 lensC = texture2D(uMap, (lp + disp) / uRes).rgb * 1.08;
+    float sd = hr - (uSurf.x + wob(hd, uTime * 1.3 + 2.0, 2.0 * uDpr * uMotion));
+    float sm = 1.0 - smoothstep(-f, f, sd);
+    float bm = 1.0 - smoothstep(-2.0 * f, 2.0 * f, hr - uSurf.y - wob(hd, uTime * 2.1 + 5.0, 5.0 * uDpr * uMotion));
+    vec3 F = vec3(uHole.xy, uSurf.x * 2.2);
+    // films refract less than the map at the rim, so their edges do not smear
+    vec2 fp = p - hn * rim * rim * 5.0 * uDpr + hn * exp(-rk * rk) * uSurf.z * 7.0 * uDpr * uMotion;
+    vec2 ua = frameUV(fp, F, uA.y), ub = frameUV(fp, F, uB.y);
+    vec3 cA = mix(texture2D(uSA, ua).rgb, texture2D(uSAv, ua).rgb, uA.x);
+    vec3 cB = mix(texture2D(uSB, ub).rgb, texture2D(uSBv, ub).rgb, uB.x);
+    vec4 s = mix(vec4(cA * uA.z, uA.z), vec4(cB * uB.z, uB.z), bm) * sm;
+    lensC = lensC * (1.0 - s.a) + s.rgb;
+    lensC *= 1.0 - 0.22 * rim * rim;
+    lensC += line(sd, 1.1 * uDpr) * 0.10 * s.a * uFilm;
+    float shade = (1.0 - smoothstep(0.0, 24.0 * uDpr, hs)) * step(0.0, hs) * (1.0 - uIdle);
+    col = mix(base * (1.0 - 0.28 * shade), lensC, lm);
+    col += line(hs, 1.1 * uDpr) * mix(0.11, 0.07, uIdle);
+  }
   col += glow * 0.03;
   gl_FragColor = vec4(col, 1.0);
 }`;
 
-  let gl = null, prog = null, U = {}, mapTex = null;
+  let gl = null, prog = null, U = {}, mapTex = null, blankTex = null;
   function initGL() {
     try {
       gl = els.stage.getContext("webgl", { alpha: false, antialias: false, premultipliedAlpha: false });
@@ -318,12 +353,13 @@ void main() {
       return s;
     };
     try {
+      if (gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS) < 7) throw new Error("too few texture units");
       prog = gl.createProgram();
       gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS));
       gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
       gl.linkProgram(prog);
       if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
-    } catch (e) { console.warn("atlas: WebGL shader failed, using 2D fallback", e); gl = null; return false; }
+    } catch (e) { console.info("atlas: WebGL unavailable, using 2D fallback", e.message); gl = null; return false; }
     gl.useProgram(prog);
     const buf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
@@ -331,10 +367,10 @@ void main() {
     const loc = gl.getAttribLocation(prog, "a");
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    for (const n of ["uMap", "uPrev", "uNext", "uRes", "uDpr", "uTime", "uMotion", "uPrevAsp", "uNextAsp", "uHasPrev", "uHasNext", "uReveal", "uHole", "uRipple", "uVel"]) U[n] = gl.getUniformLocation(prog, n);
-    gl.uniform1i(U.uMap, 0); gl.uniform1i(U.uPrev, 1); gl.uniform1i(U.uNext, 2);
+    for (const n of ["uMap", "uPrev", "uNext", "uSA", "uSAv", "uSB", "uSBv", "uRes", "uVel", "uDpr", "uTime", "uMotion", "uPrevAsp", "uNextAsp", "uHasPrev", "uHasNext", "uFilm", "uIdle", "uPrevF", "uNextF", "uReveal", "uHole", "uRipple", "uSurf", "uA", "uB"]) U[n] = gl.getUniformLocation(prog, n);
+    ["uMap", "uPrev", "uNext", "uSA", "uSAv", "uSB", "uSBv"].forEach((n, i) => gl.uniform1i(U[n], i));
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-    mapTex = makeTex();
+    mapTex = makeTex(); blankTex = makeTex();
     return true;
   }
   function makeTex() {
@@ -352,22 +388,26 @@ void main() {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, src);
   }
 
-  // ---------- video slots ----------
-  const slots = [...document.querySelectorAll(".videos video")].map((el) => ({ el, tex: null, asp: 16 / 9, place: null, hasContent: false, tainted: false, failed: false }));
+  // ---------- media ----------
+  const videoEls = [...document.querySelectorAll(".videos video")];
+  const slots = videoEls.slice(0, 2).map((el) => ({ el, tex: null, asp: 16 / 9, place: null, hasContent: false, tainted: false, failed: false, lastT: -1 }));
+  // One muted <video> feeds the lens; two textures ping-pong so the outgoing place keeps its last frame.
+  const preview = { el: videoEls[2], place: null, timer: 0, lastT: -1, frames: 0, idleTimer: 0 };
+  let vidTex = [null, null];
   const assetURL = (rel) => new URL(rel, S.manifestBase).href;
 
   function loadSlot(slot, place, autoplay) {
     if (slot.place && slot.place.id === place.id && slot.el.getAttribute("src")) {
-      if (autoplay) slot.el.play().catch(() => {});
+      if (autoplay) playEl(slot.el);
       return;
     }
-    slot.place = place; slot.hasContent = false; slot.tainted = false; slot.failed = false;
+    slot.place = place; slot.hasContent = false; slot.tainted = false; slot.failed = false; slot.lastT = -1;
     const el = slot.el;
     el.crossOrigin = "anonymous";
     el.muted = S.muted;
     el.preload = "auto";
     el.src = assetURL(place.video);
-    if (autoplay) el.play().catch(() => {});
+    if (autoplay) playEl(el);
     const img = posterFor(place);
     const usePoster = () => {
       if (slot.place !== place || slot.hasContent || !img.naturalWidth) return;
@@ -376,11 +416,29 @@ void main() {
     };
     if (img.complete) usePoster(); else img.addEventListener("load", usePoster, { once: true });
   }
+  // Play with the remembered sound choice; if the browser refuses sound without a
+  // gesture, play muted this time (the remembered choice is left alone).
+  function playEl(el) {
+    el.muted = S.muted;
+    el.play().catch(() => {
+      if (el.muted) return;
+      S.muted = true; syncSound();
+      for (const s of slots) s.el.muted = true;
+      el.play().catch(() => {});
+    });
+  }
+  function syncSound() {
+    els.mute.textContent = S.muted ? "Sound on" : "Sound off";
+    els.mute.setAttribute("aria-pressed", String(!S.muted));
+  }
+  function clearVideo(el) {
+    el.pause();
+    el.removeAttribute("src");
+    el.load();
+    el.classList.remove("is-on");
+  }
   function unloadSlot(slot) {
-    slot.el.pause();
-    slot.el.removeAttribute("src");
-    slot.el.load();
-    slot.el.classList.remove("is-on");
+    clearVideo(slot.el);
     slot.place = null; slot.hasContent = false;
   }
   function posterFor(place) {
@@ -395,16 +453,75 @@ void main() {
     }
     return img;
   }
-  for (const slot of slots) {
-    slot.el.addEventListener("error", () => {
-      if (!slot.place) return;
+  // Lens-sized poster textures (downscaled once; the lens never needs more than ~640px).
+  const posterTexCache = new Map();
+  const scaleCv = document.createElement("canvas");
+  function posterTex(place) {
+    let e = posterTexCache.get(place.id);
+    if (e || !gl) return e || null;
+    e = { tex: makeTex(), ready: false, asp: 16 / 9 };
+    posterTexCache.set(place.id, e);
+    const img = posterFor(place);
+    const done = () => {
+      if (!img.naturalWidth) return;
+      const w = Math.min(640, img.naturalWidth), h = Math.round(w * img.naturalHeight / img.naturalWidth);
+      scaleCv.width = w; scaleCv.height = h;
+      const c = scaleCv.getContext("2d"); c.drawImage(img, 0, 0, w, h);
+      try { upload(e.tex, scaleCv); e.ready = true; e.asp = w / h; } catch (_) {}
+    };
+    if (img.complete) done(); else img.addEventListener("load", done, { once: true });
+    return e;
+  }
+  function slotOf(el) { return slots.find((s) => s.el === el); }
+  for (const el of videoEls) {
+    el.addEventListener("error", () => {
+      const slot = slotOf(el);
+      if (!slot || !slot.place) return;
       slot.failed = true;
       if (slot === S.next || slot === S.cur) els.line.textContent = "This film is not available right now.";
     });
   }
   const otherSlot = (slot) => (slot === slots[0] ? slots[1] : slots[0]);
 
-  // ---------- selection ----------
+  function wantPreview(place) {
+    clearTimeout(preview.idleTimer); preview.idleTimer = 0;
+    if (preview.place === place) { if (preview.el.paused && preview.el.getAttribute("src")) preview.el.play().catch(() => {}); return; }
+    clearTimeout(preview.timer);
+    // A short dwell so sweeping across the map does not start a download per dot.
+    preview.timer = setTimeout(() => {
+      preview.place = place; preview.lastT = -1; preview.frames = 0;
+      const el = preview.el;
+      el.crossOrigin = "anonymous"; el.muted = true; el.loop = true; el.preload = "auto";
+      el.src = assetURL(place.video);
+      el.play().catch(() => {});
+    }, reduced() ? 0 : 120);
+  }
+  function restPreview() {
+    clearTimeout(preview.timer);
+    if (preview.idleTimer || !preview.place) return;
+    preview.idleTimer = setTimeout(() => { preview.idleTimer = 0; if (!S.surf.cur) preview.el.pause(); }, 1200);
+  }
+
+  // ---------- picking ----------
+  function screenOf(p, nearX) {
+    const q = project(p.lng, p.lat);
+    return { x: nearestCopyX(q.x, nearX, S.view.s), y: q.y };
+  }
+  // What the lens at (x, y) would surface. Bare map: the nearest place within reach (with a
+  // distance fade). During a film: only a place inside the lens, never the one playing.
+  function pickAt(x, y) {
+    const film = playing(), R = lensR();
+    const reach = film ? R * 0.85 : R * 2.6;
+    let best = null, bd = Infinity;
+    for (const p of S.places) {
+      if (film && ((S.pin && p.id === S.pin.id))) continue;
+      const q = screenOf(p, x);
+      const d = Math.hypot(q.x - x, q.y - y);
+      if (d < bd) { bd = d; best = p; }
+    }
+    if (!best || bd > reach) return null;
+    return { place: best, d: bd, str: film ? 1 : 1 - smooth(R * 1.6, reach, bd) };
+  }
   function nearestPlace(lng, lat) {
     let best = null, bd = Infinity;
     const c1 = Math.cos(lat * RAD);
@@ -415,35 +532,83 @@ void main() {
     }
     return best;
   }
+  // Flip through the world: the next place east (dir 1) or west (-1) by longitude, wrapping.
+  function neighbor(from, dir, filter) {
+    let best = null, bd = Infinity;
+    for (const p of S.places) {
+      if (p.id === from.id || (filter && !filter(p))) continue;
+      let dl = wrap180(p.lng - from.lng) * dir;
+      if (dl <= 0) dl += 360;
+      if (dl < bd) { bd = dl; best = p; }
+    }
+    return best;
+  }
 
-  function select(place, x, y) {
+  // ---------- selection ----------
+  const coverFrame = (asp) => ({ x: S.W / 2, y: S.H / 2, h: Math.max(S.H, S.W / asp) });
+
+  function select(place, x, y, opt = {}) {
     if (!place) return;
     S.started = true;
     if (S.cardOpen) { minimizeCard(false); S.panAfterReveal = !S.userMoved; }
-    if (S.closing) { // resume from a close in progress
-      S.cur = S.closing.slot; S.closing = null;
-    }
+    if (S.closing) { S.cur = S.closing.slot; S.closing = null; }
     if (S.cur && S.cur.place && S.cur.place.id === place.id && !S.next) {
       S.ripple = reduced() ? null : { x, y, t0: performance.now() };
       return;
     }
-    S.pin = place; S.mapDirty = true;
-    S.ripple = reduced() ? null : { x, y, t0: performance.now() };
+    S.pin = place; S.hot = null; S.mapDirty = true;
+    S.ripple = reduced() || opt.fromLens ? null : { x, y, t0: performance.now() };
     const slot = S.next || (S.cur ? otherSlot(S.cur) : slots[0]);
-    loadSlot(slot, place, true);
+    const sc = S.surf.cur;
+    let r0 = 0, f0 = null;
+    if (opt.fromLens && sc && sc.place === place) {
+      // Bloom out of the lens: the film keeps the size and position it had inside it.
+      const surfR = playing() ? lensR() * 0.5 * (1 + 0.15 * S.hole.swell) : S.hole.r;
+      r0 = surfR; f0 = { x: S.hole.x, y: S.hole.y, h: surfR * 2.2 };
+      x = S.hole.x; y = S.hole.y;
+    }
+    if (gl && sc && sc.place === place && preview.place === place && sc.vidOn && preview.el.readyState >= 2) {
+      // Hand the lens's live <video> to the film slot: no reload, no restart.
+      const el = slot.el; slot.el = preview.el; preview.el = el;
+      const t = slot.tex; slot.tex = vidTex[sc.vt]; vidTex[sc.vt] = t;
+      clearVideo(preview.el); preview.place = null; clearTimeout(preview.timer);
+      Object.assign(slot, { place, hasContent: true, tainted: false, failed: false, lastT: -1, asp: slot.el.videoWidth / slot.el.videoHeight || 16 / 9 });
+      playEl(slot.el);
+    } else loadSlot(slot, place, true);
     S.next = slot;
-    S.reveal = { x, y, t0: 0, rMax: Math.hypot(Math.max(x, S.W - x), Math.max(y, S.H - y)) + 80 };
+    S.surf = { cur: null, old: null, t0: 0 };
+    S.hole.r = 0; S.hole.holdUntil = performance.now() + (reduced() ? 0 : 1300);
+    S.reveal = { x, y, t0: 0, r0, f0, rMax: Math.hypot(Math.max(x, S.W - x), Math.max(y, S.H - y)) + 80 };
     showPanel(place);
     document.body.classList.add("is-playing");
     updateHint();
+  }
+
+  function flip(dir) {
+    const from = (S.next || S.cur || {}).place;
+    if (!from || S.closing) return;
+    go(neighbor(from, dir));
+  }
+  // Jump to a place from the keyboard or the caption: pan the (hidden) map if it is off-screen,
+  // and open the film from where the place sits on the map.
+  function go(place) {
+    if (!place) return;
+    let q = screenOf(place, S.W / 2);
+    if (q.x < S.W * 0.08 || q.x > S.W * 0.92 || q.y < S.H * 0.08 || q.y > S.H * 0.92) {
+      const half = S.H / 2 / S.view.s;
+      const target = { ...S.view, c: place.lng, y: clamp(ym(place.lat), -YM_MAX + half, Math.max(-YM_MAX + half, YM_MAX - half)) };
+      setView(target, false);
+      q = screenOf(place, S.W / 2);
+    }
+    select(place, clamp(q.x, S.W * 0.06, S.W * 0.94), clamp(q.y, S.H * 0.1, S.H * 0.9));
   }
 
   function closeVideo() {
     if (!S.cur && !S.next) return;
     if (S.next) { unloadSlot(S.next); S.next = null; S.reveal = null; }
     if (!S.cur) { finishClose(); return; }
-    const q = S.pin ? project(S.pin.lng, S.pin.lat) : { x: S.W / 2, y: S.H / 2 };
-    const x = clamp(nearestCopyX(q.x, S.W / 2, S.view.s), 0, S.W), y = clamp(q.y, 0, S.H);
+    const q = S.pin ? screenOf(S.pin, S.W / 2) : { x: S.W / 2, y: S.H / 2 };
+    const x = clamp(q.x, 0, S.W), y = clamp(q.y, 0, S.H);
     S.closing = { slot: S.cur, x, y, t0: performance.now(), rMax: Math.hypot(Math.max(x, S.W - x), Math.max(y, S.H - y)) + 80 };
     S.cur = null;
     document.body.classList.remove("is-playing");
@@ -463,18 +628,46 @@ void main() {
     const [y, m, d] = (iso || "").split("-").map(Number);
     return y && m && d ? `as of ${MONTHS[m - 1]} ${d}, ${y}` : "";
   }
+  // localTime is shown exactly as the manifest states it (never derived from longitude).
+  function fmtLocal(v) {
+    if (typeof v !== "string" || !v) return "";
+    const t = v.match(/T(\d{2}:\d{2})/) || v.match(/^(\d{1,2}:\d{2}(?:\s?[AaPp][Mm])?)/);
+    if (t) return t[1];
+    return v.length <= 16 ? v : "";
+  }
+  const momentLabel = (m) => (typeof m === "string" ? m : m && typeof m === "object" ? (m.label || m.title || m.text || "") : "");
+  function placeThreads(place) {
+    return (Array.isArray(place.threads) ? place.threads : []).map((id) => S.threads.get(id)).filter(Boolean);
+  }
   let lineText = null;
   function showPanel(place) {
     els.name.textContent = place.country && place.country !== place.name ? `${place.name}, ${place.country}` : place.name;
-    els.asof.textContent = fmtDate(place.asOf);
+    const local = fmtLocal(place.localTime);
+    els.asof.textContent = [S.moment || fmtDate(place.asOf), local && `${local} local`].filter(Boolean).join(" · ");
     setLine("");
     els.sources.replaceChildren(...(place.sources || []).slice(0, 4).map((s) => {
       const a = document.createElement("a");
       a.href = s.url; a.target = "_blank"; a.rel = "noopener";
-      a.textContent = s.outlet || new URL(s.url).hostname.replace(/^www\./, "");
+      try { a.textContent = s.outlet || new URL(s.url).hostname.replace(/^www\./, ""); } catch (_) { a.textContent = s.outlet || "Source"; }
       if (s.title) a.title = s.title;
       return a;
     }));
+    const music = place.music && typeof place.music === "object" ? place.music.title : typeof place.music === "string" ? place.music : "";
+    els.music.textContent = music ? `Music: ${music}` : "";
+    const w = neighbor(place, -1), e = neighbor(place, 1);
+    els.prev.hidden = !w; els.next.hidden = !e;
+    if (w) { els.prev.querySelector(".nav-name").textContent = w.name; els.prev.setAttribute("aria-label", `West to ${w.name}`); }
+    if (e) { els.next.querySelector(".nav-name").textContent = e.name; els.next.setAttribute("aria-label", `East to ${e.name}`); }
+    // Threads: a tiny tag that jumps to the next place (eastward) on the same story.
+    els.thread.hidden = true; els.thread.dataset.target = "";
+    for (const th of placeThreads(place)) {
+      const to = neighbor(place, 1, (p) => Array.isArray(p.threads) && p.threads.includes(th.id));
+      if (!to) continue;
+      els.thread.textContent = `${th.title} → ${to.name}`;
+      els.thread.setAttribute("aria-label", `Thread: ${th.title}. Next: ${to.name}`);
+      els.thread.dataset.target = to.id; els.thread.hidden = false;
+      break;
+    }
   }
   function setLine(text) {
     if (text === lineText) return;
@@ -491,34 +684,59 @@ void main() {
     setLine(c ? c.text : "");
   }
 
-  // ---------- card ----------
+  // ---------- card <-> note ----------
+  // The card folds into a small wall label; the same white sheet travels between the two.
+  function foldSheet(from, to, radii, done) {
+    if (reduced() || !els.fold.animate) { done(); return; }
+    const f = els.fold;
+    f.style.display = "block";
+    const kf = (r, rad) => ({ left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px", borderRadius: rad + "px" });
+    const a = f.animate([kf(from, radii[0]), kf(to, radii[1])], { duration: 440, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)", fill: "forwards" });
+    a.onfinish = () => {
+      done();
+      const b = f.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, fill: "forwards" });
+      b.onfinish = () => { f.style.display = "none"; a.cancel(); b.cancel(); };
+    };
+  }
   function minimizeCard(pan = true) {
     if (!S.cardOpen) return;
     S.cardOpen = false;
     const hadFocus = els.card.contains(document.activeElement);
+    const from = els.card.getBoundingClientRect();
+    els.note.classList.toggle("is-compact", mqNarrow.matches);
+    const to = els.note.getBoundingClientRect();
     els.card.classList.add("is-min");
     els.card.setAttribute("aria-hidden", "true");
     els.card.inert = true;
-    els.chip.classList.add("is-on");
-    els.chip.setAttribute("aria-expanded", "false");
-    if (hadFocus) els.chip.focus({ preventScroll: true });
+    els.noteOpen.setAttribute("aria-expanded", "false");
+    foldSheet(from, to, [16, mqNarrow.matches ? 10 : 8], () => els.note.classList.add("is-on"));
+    if (hadFocus) els.noteOpen.focus({ preventScroll: true });
     if (pan && !S.cur && !S.next && !S.userMoved) setView(worldView(), true);
     updateHint();
   }
   function openCard() {
     if (S.cardOpen) return;
     S.cardOpen = true;
+    const from = els.note.getBoundingClientRect();
+    els.note.classList.remove("is-on");
+    els.noteOpen.setAttribute("aria-expanded", "true");
     els.card.inert = false;
     els.card.removeAttribute("aria-hidden");
-    els.card.classList.remove("is-min");
-    els.chip.classList.remove("is-on");
-    els.chip.setAttribute("aria-expanded", "true");
+    // measure the card where it will land (its closed transform is only a small offset)
+    const cr = els.card.getBoundingClientRect();
+    const to = { left: (S.W - cr.width) / 2, top: (S.H - cr.height) / 2, width: cr.width, height: cr.height };
+    foldSheet(from, to, [8, 16], () => els.card.classList.remove("is-min"));
     els.card.focus({ preventScroll: true });
     if (!S.cur && !S.next) { S.userMoved = false; setView(cardView(), true); }
     updateHint();
   }
+  els.note.addEventListener("click", (e) => {
+    if (e.target.closest("a")) return;
+    if (els.note.classList.contains("is-compact")) { els.note.classList.remove("is-compact"); return; }
+    openCard();
+  });
   function updateHint() {
-    els.hint.textContent = mqCoarse.matches ? "Tap any place on the map. Drag to look around." : "Choose any place on the map.";
+    els.hint.textContent = mqCoarse.matches ? "Press and drag across the map." : "Move across the map. Click a place to watch.";
     els.hint.classList.toggle("is-on", !S.cardOpen && !S.cur && !S.next && !S.closing && !S.started);
   }
 
@@ -526,50 +744,43 @@ void main() {
   function onDown(e) {
     const t = e.pointerType || "mouse";
     S.pointer = { x: e.clientX, y: e.clientY, inside: true, type: t };
+    S.lastMove = performance.now();
     S.down = { id: e.pointerId, x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, moved: false, type: t };
     try { els.stage.setPointerCapture(e.pointerId); } catch (_) {}
+    if (mqNarrow.matches && !S.cardOpen) els.note.classList.add("is-compact");
     if (t !== "mouse") { S.hole.hideAt = 0; if (S.hole.r < 1) { S.hole.x = e.clientX; S.hole.y = e.clientY; } }
-    // Start fetching the likely pick before the tap resolves.
-    if (!S.cur && !S.next && S.places.length) {
-      const g = unproject(e.clientX, e.clientY);
-      const p = nearestPlace(g.lng, g.lat);
-      if (p) posterFor(p);
-    }
   }
   function onMove(e) {
     const t = e.pointerType || "mouse";
     S.pointer = { x: e.clientX, y: e.clientY, inside: true, type: t };
+    S.lastMove = performance.now();
     const d = S.down;
     if (!d || d.id !== e.pointerId) return;
     if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 6) d.moved = true;
-    if (d.moved && !S.cur && !S.next && !S.closing) {
-      if (S.cardOpen) minimizeCard(false);
+    if (d.moved && S.cardOpen) minimizeCard(false);
+    // Mouse drag pans the bare map; a touch drag moves the lens (the map pans at the edges).
+    if (d.moved && t === "mouse" && !playing() && !S.closing) {
       S.anim = null; S.userMoved = true;
-      const v = S.view;
-      const half = S.H / 2 / v.s;
-      S.view = {
-        ...v,
-        c: wrap180(v.c - (e.clientX - d.lx) / v.s),
-        y: clamp(v.y + (e.clientY - d.ly) / v.s, -YM_MAX + half, Math.max(-YM_MAX + half, YM_MAX - half)),
-      };
-      S.mapDirty = true;
+      panBy(e.clientX - d.lx, e.clientY - d.ly);
     }
     d.lx = e.clientX; d.ly = e.clientY;
+  }
+  function panBy(dx, dy) {
+    const v = S.view, half = S.H / 2 / v.s;
+    S.view = { ...v, c: wrap180(v.c - dx / v.s), y: clamp(v.y + dy / v.s, -YM_MAX + half, Math.max(-YM_MAX + half, YM_MAX - half)) };
+    S.mapDirty = true;
   }
   function onUp(e) {
     const d = S.down; S.down = null;
     if (!d || d.id !== e.pointerId) return;
-    if (d.type !== "mouse") S.hole.hideAt = performance.now() + 1400;
-    if (d.moved) return;
-    tap(e.clientX, e.clientY, d.type);
+    if (d.type !== "mouse") S.hole.hideAt = performance.now() + 900;
+    if (d.moved && d.type === "mouse") return;
+    tap(e.clientX, e.clientY);
   }
-  function tap(x, y, type) {
-    if (S.cur && !S.cardOpen && type === "mouse") {
-      // With a film playing, only a click inside the reveal picks a new place.
-      if (Math.hypot(x - S.hole.x, y - S.hole.y) > S.hole.r + 8 || S.hole.r < 24) return;
-    }
-    const g = unproject(x, y);
-    select(nearestPlace(g.lng, g.lat), x, y);
+  function tap(x, y) {
+    const hit = pickAt(x, y);
+    if (hit) { select(hit.place, x, y, { fromLens: true }); return; }
+    if (S.cardOpen) minimizeCard(true);
   }
 
   els.stage.addEventListener("pointerdown", onDown);
@@ -578,18 +789,25 @@ void main() {
   els.stage.addEventListener("pointercancel", () => { S.down = null; S.hole.hideAt = performance.now() + 600; });
   els.stage.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") S.pointer.inside = false; });
   document.addEventListener("mouseleave", () => { S.pointer.inside = false; });
-  els.chip.addEventListener("click", openCard);
   els.close.addEventListener("click", closeVideo);
+  els.prev.addEventListener("click", () => flip(-1));
+  els.next.addEventListener("click", () => flip(1));
+  els.thread.addEventListener("click", () => go(S.places.find((p) => p.id === els.thread.dataset.target)));
   els.mute.addEventListener("click", () => {
     S.muted = !S.muted;
+    try { localStorage.setItem("atlas-sound", S.muted ? "off" : "on"); } catch (_) {}
     for (const s of slots) s.el.muted = S.muted;
-    els.mute.textContent = S.muted ? "Unmute" : "Mute";
-    els.mute.setAttribute("aria-pressed", String(!S.muted));
+    syncSound();
     const s = S.next || S.cur; if (s && s.el.paused) s.el.play().catch(() => {});
   });
+  syncSound();
   document.addEventListener("keydown", (e) => {
-    if (e.key !== "Escape") return;
-    if (S.cardOpen) minimizeCard(true); else if (S.cur || S.next) closeVideo();
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === "Escape") {
+      if (S.cardOpen) minimizeCard(true); else if (S.cur || S.next) closeVideo();
+    } else if ((e.key === "ArrowRight" || e.key === "ArrowLeft") && playing()) {
+      e.preventDefault(); flip(e.key === "ArrowRight" ? 1 : -1);
+    }
   });
 
   // ---------- frame loop ----------
@@ -603,67 +821,112 @@ void main() {
     if (gl) { els.stage.width = mapCv.width; els.stage.height = mapCv.height; }
     else { mapCv.style.width = W + "px"; mapCv.style.height = H + "px"; }
     if (!first && S.raster && !S.userMoved) setView(S.cardOpen && !S.cur ? cardView() : worldView(), false);
+    if (!S.cardOpen) els.note.classList.toggle("is-compact", mqNarrow.matches);
     S.mapDirty = true;
   }
 
-  function updateTip() {
-    const p = S.pointer;
-    let show = null;
-    if (p.inside && p.type === "mouse" && !S.down && !S.closing && S.places.length) {
-      const inHole = !!S.cur;
-      if (!inHole || S.hole.r > 24) {
-        const g = unproject(p.x, p.y), near = nearestPlace(g.lng, g.lat);
-        if (near) {
-          const q = project(near.lng, near.lat);
-          const x = nearestCopyX(q.x, p.x, S.view.s);
-          const d = Math.hypot(x - p.x, q.y - p.y);
-          if (d < 140) posterFor(near);
-          const within = inHole ? Math.hypot(x - S.hole.x, q.y - S.hole.y) < S.hole.r - 12 : d < 48;
-          if (within && !(S.pin && S.pin.id === near.id && (S.cur || S.next))) show = { near, x, y: q.y };
-        }
+  // Decide what the lens surfaces this frame and animate the swap.
+  function stepSurface(now, dt, lensOn) {
+    const sf = S.surf, H = S.hole;
+    let hit = lensOn && S.places.length ? pickAt(H.x, H.y) : null;
+    const cur = sf.cur;
+    // hysteresis: keep the current place unless the new one is clearly closer
+    if (hit && cur && hit.place !== cur.place) {
+      const q = screenOf(cur.place, H.x), dc = Math.hypot(q.x - H.x, q.y - H.y);
+      const reach = playing() ? lensR() * 0.85 : lensR() * 2.6;
+      if (dc < reach && dc < hit.d + 12) hit = { place: cur.place, d: dc, str: playing() ? 1 : 1 - smooth(lensR() * 1.6, reach, dc) };
+    }
+    if (hit && (!cur || hit.place !== cur.place)) {
+      const pt = posterTex(hit.place);
+      if (pt) {
+        const vt = cur ? 1 - cur.vt : 0;
+        sf.old = cur && cur.alpha > 0.02 ? cur : null;
+        sf.cur = { place: hit.place, vt, vidMix: 0, vidOn: false, fade: 0, str: hit.str, alpha: 0, pt };
+        sf.t0 = now;
+        wantPreview(hit.place);
       }
     }
-    if (show) {
-      if (els.tip.dataset.id !== show.near.id) {
-        els.tip.dataset.id = show.near.id;
-        const span = document.createElement("span");
-        span.textContent = show.near.name;
-        if (show.near.country && show.near.country !== show.near.name) {
-          const sm = document.createElement("small"); sm.textContent = show.near.country; span.append(sm);
-        }
-        els.tip.replaceChildren(span);
-      }
-      els.tip.style.transform = `translate(${show.x}px, ${show.y}px)`;
-      els.tip.classList.add("is-on");
-      els.stage.style.cursor = "pointer";
-    } else {
-      els.tip.classList.remove("is-on");
-      els.stage.style.cursor = "";
+    const c = sf.cur;
+    if (c) {
+      const on = !!hit && hit.place === c.place;
+      if (on) c.str = hit.str;
+      c.fade = reduced() ? (on ? 1 : 0) : approach(c.fade, on ? 1 : 0, dt, on ? 90 : 140);
+      c.alpha = c.fade * c.str * (c.pt.ready ? 1 : 0);
+      if (!on && c.fade < 0.01) { sf.cur = null; sf.old = null; restPreview(); }
     }
+    const hot = sf.cur && sf.cur.alpha > 0.2 ? sf.cur.place : null;
+    if (hot !== S.hot) { S.hot = hot; S.mapDirty = true; }
+    // live frames from the preview video
+    const pc = sf.cur, el = preview.el;
+    if (gl && pc && preview.place === pc.place && el.readyState >= 2 && el.videoWidth) {
+      if (el.currentTime !== preview.lastT) {
+        try { upload(vidTex[pc.vt], el); preview.frames++; } catch (_) {}
+        preview.lastT = el.currentTime;
+        if (preview.frames >= 2) pc.vidOn = true;
+      }
+    }
+    for (const s of [sf.cur, sf.old]) if (s) s.vidMix = reduced() ? (s.vidOn ? 1 : 0) : approach(s.vidMix, s.vidOn ? 1 : 0, dt, 160);
+    const sp = reduced() ? 1 : clamp((now - sf.t0) / 700, 0, 1);
+    if (sp >= 1) sf.old = null;
+    return sp;
   }
 
+  function updateLabel(lensOn) {
+    const c = S.surf.cur, H = S.hole;
+    const show = gl ? lensOn && c && c.alpha > 0.25 : null;
+    let place = show ? c.place : null, x = H.x, y = H.y + H.r + 14;
+    if (!gl) { // 2D fallback: label the nearest place under a plain cursor
+      const hit = S.pointer.inside && S.pointer.type === "mouse" && !playing() ? pickAt(S.pointer.x, S.pointer.y) : null;
+      if (hit && hit.d < 48) { place = hit.place; const q = screenOf(place, S.pointer.x); x = q.x; y = q.y + 14; }
+    }
+    if (place) {
+      if (els.tip.dataset.id !== place.id) {
+        els.tip.dataset.id = place.id;
+        const span = document.createElement("span");
+        span.textContent = place.name;
+        const local = fmtLocal(place.localTime);
+        if (local) { const sm = document.createElement("small"); sm.textContent = local; span.append(sm); }
+        els.tip.replaceChildren(span);
+      }
+      if (y > S.H - 28) y = H.y - H.r - 26;
+      els.tip.style.transform = `translate(${clamp(x, 60, S.W - 60)}px, ${y}px)`;
+      els.tip.classList.add("is-on");
+    } else els.tip.classList.remove("is-on");
+    els.stage.style.cursor = place && S.pointer.type === "mouse" ? "pointer" : "";
+  }
+
+  function preloadNear(x, y) {
+    const list = S.places.map((p) => { const q = screenOf(p, x); return [Math.hypot(q.x - x, q.y - y), p]; }).sort((a, b) => a[0] - b[0]);
+    for (let i = 0; i < Math.min(3, list.length); i++) posterTex(list[i][1]) || posterFor(list[i][1]);
+  }
+
+  let lastPreload = { x: -1e4, y: -1e4 };
   function frame(now) {
     requestAnimationFrame(frame);
     const dt = Math.min(64, now - S.lastT); S.lastT = now;
     const motion = !reduced();
     stepView(now);
 
-    // video uploads + reveal start
+    // video uploads (only when a new frame is available) + reveal start
     for (const slot of [S.cur, S.next, S.closing && S.closing.slot]) {
       if (!slot || !slot.place || slot.tainted) continue;
       const el = slot.el;
       if (el.readyState >= 2 && el.videoWidth) {
         if (gl) {
-          try { upload(slot.tex, el); } catch (_) { slot.tainted = true; continue; }
+          if (el.currentTime !== slot.lastT) {
+            try { upload(slot.tex, el); } catch (_) { slot.tainted = true; continue; }
+            slot.lastT = el.currentTime;
+          }
         } else el.classList.add("is-on");
         slot.asp = el.videoWidth / el.videoHeight; slot.hasContent = true;
       }
     }
     if (S.next && S.next.hasContent && S.reveal && !S.reveal.t0) S.reveal.t0 = now;
-    let revealR = 0;
+    let revealR = 0, revealE = 0;
     if (S.reveal && S.reveal.t0) {
       const t = motion ? clamp((now - S.reveal.t0) / 1150, 0, 1) : 1;
-      revealR = easeOut(t) * S.reveal.rMax;
+      revealE = easeOut(t);
+      revealR = S.reveal.r0 + revealE * (S.reveal.rMax - S.reveal.r0);
       if (t >= 1) {
         if (S.cur && S.cur !== S.next) unloadSlot(S.cur);
         S.cur = S.next; S.next = null; S.reveal = null;
@@ -677,23 +940,36 @@ void main() {
       if (t >= 1) finishClose();
     }
 
-    // hole
-    const H = S.hole, P = S.pointer;
+    // lens
+    const H = S.hole, P = S.pointer, film = playing();
     const touchHeld = P.type !== "mouse" && (S.down || now < H.hideAt);
-    const want = S.cur && !S.closing && (P.type === "mouse" ? P.inside : touchHeld);
-    const R0 = (S.W < 560 ? 88 : 128);
+    const lensOn = !S.closing && now >= H.holdUntil && (P.type === "mouse" ? P.inside : touchHeld) && S.places.length > 0;
+    // touch: drag near the left/right edge to pan the map under the lens
+    if (S.down && S.down.type !== "mouse" && S.down.moved) {
+      const m = 44, ex = P.x < m ? (m - P.x) / m : P.x > S.W - m ? -(P.x - (S.W - m)) / m : 0;
+      if (ex) { S.anim = null; S.userMoved = true; panBy(ex * 7 * dt / 16, 0); }
+    }
     const k = motion ? 1 - Math.exp(-dt / 70) : 1;
     const px = H.x, py = H.y;
     if (P.inside || touchHeld) { H.x += (P.x - H.x) * k; H.y += (P.y - H.y) * k; }
-    H.r += ((want ? R0 : 0) - H.r) * (motion ? 1 - Math.exp(-dt / 110) : 1);
-    if (H.r < 0.5 && !want) H.r = 0;
+    const sp = gl ? stepSurface(now, dt, lensOn) : 1;
+    // During a film the lens rests as a faint ring after 1.5s of stillness, and swells a
+    // little when a place is within reach ("click jumps here").
+    const still = film && P.type === "mouse" && now - S.lastMove > 1500;
+    H.idle = motion ? approach(H.idle, still ? 1 : 0, dt, still ? 260 : 60) : (still ? 1 : 0);
+    const snap = film && S.surf.cur && S.surf.cur.fade > 0.5 ? 1 : 0;
+    H.swell = motion ? approach(H.swell, snap, dt, 120) : snap;
+    const R0 = lensR() * (1 + 0.15 * H.swell) * (1 - 0.35 * H.idle);
+    H.r = motion ? approach(H.r, lensOn ? R0 : 0, dt, 110) : (lensOn ? R0 : 0);
+    if (H.r < 0.5 && !lensOn) H.r = 0;
     const vk = 1 - Math.exp(-dt / 90);
     H.vx += ((H.x - px) / Math.max(dt, 1) * 16 - H.vx) * vk;
     H.vy += ((H.y - py) / Math.max(dt, 1) * 16 - H.vy) * vk;
+    if (lensOn && Math.hypot(H.x - lastPreload.x, H.y - lastPreload.y) > 40) { lastPreload = { x: H.x, y: H.y }; preloadNear(H.x, H.y); }
 
     if (S.ripple && (now - S.ripple.t0) > 1800) S.ripple = null;
     updateCaption();
-    updateTip();
+    updateLabel(lensOn && H.r > 8 && H.idle < 0.5);
 
     if (S.mapDirty) {
       drawMap(); S.mapDirty = false;
@@ -707,22 +983,39 @@ void main() {
     gl.uniform1f(U.uDpr, d);
     gl.uniform1f(U.uTime, motion ? now / 1000 : 0);
     gl.uniform1f(U.uMotion, motion ? 1 : 0);
-    let prev = null, next = null, rv = [0, 0, 0];
-    if (S.closing) { next = S.closing.slot; rv = [S.closing.x, S.closing.y, closeR]; }
+    let prev = null, next = null, rv = [0, 0, 0], nf = null;
+    if (S.closing) { next = S.closing.slot; rv = [S.closing.x, S.closing.y, closeR]; nf = coverFrame(next.asp); }
     else {
       prev = S.cur && S.cur.hasContent ? S.cur : null;
-      if (S.next && S.reveal && S.reveal.t0) { next = S.next; rv = [S.reveal.x, S.reveal.y, revealR]; }
+      if (S.next && S.reveal && S.reveal.t0) {
+        next = S.next; rv = [S.reveal.x, S.reveal.y, revealR];
+        const full = coverFrame(next.asp), f0 = S.reveal.f0;
+        nf = f0 ? { x: f0.x + (full.x - f0.x) * revealE, y: f0.y + (full.y - f0.y) * revealE, h: f0.h * Math.pow(full.h / f0.h, revealE) } : full;
+      }
     }
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, mapTex);
-    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, prev ? prev.tex : mapTex);
-    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, next ? next.tex : mapTex);
+    const pf = prev ? coverFrame(prev.asp) : { x: 0, y: 0, h: 1 };
+    const sf = S.surf, A = sf.old, B = sf.cur;
+    const bind = (unit, tex) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tex || blankTex); };
+    bind(0, mapTex);
+    bind(1, prev && prev.tex); bind(2, next && next.tex);
+    bind(3, A && A.pt.tex); bind(4, A && vidTex[A.vt]);
+    bind(5, B && B.pt.tex); bind(6, B && vidTex[B.vt]);
     gl.uniform1f(U.uHasPrev, prev ? 1 : 0);
     gl.uniform1f(U.uHasNext, next ? 1 : 0);
     gl.uniform1f(U.uPrevAsp, prev ? prev.asp : 1);
     gl.uniform1f(U.uNextAsp, next ? next.asp : 1);
+    gl.uniform3f(U.uPrevF, pf.x * d, pf.y * d, pf.h * d);
+    gl.uniform3f(U.uNextF, nf ? nf.x * d : 0, nf ? nf.y * d : 0, nf ? nf.h * d : 1);
     gl.uniform3f(U.uReveal, rv[0] * d, rv[1] * d, rv[2] * d);
-    gl.uniform3f(U.uHole, H.x * d, H.y * d, prev ? H.r * d : 0);
+    gl.uniform3f(U.uHole, H.x * d, H.y * d, H.r * d);
     gl.uniform2f(U.uVel, motion ? H.vx * d : 0, motion ? H.vy * d : 0);
+    gl.uniform1f(U.uFilm, film ? 1 : 0);
+    gl.uniform1f(U.uIdle, H.idle);
+    const surfR = film ? H.r * 0.5 : H.r;
+    const front = A || sp < 1 ? easeOut(sp) * surfR * 1.35 : 1e5;
+    gl.uniform3f(U.uSurf, surfR * d, front * d, motion && sp < 1 ? Math.pow(1 - sp, 1.5) : 0);
+    gl.uniform4f(U.uA, A ? A.vidMix : 0, A ? A.pt.asp : 1, A ? A.alpha : 0, 0);
+    gl.uniform4f(U.uB, B ? B.vidMix : 0, B ? B.pt.asp : 1, B ? B.alpha : 0, 0);
     if (S.ripple && motion) gl.uniform3f(U.uRipple, S.ripple.x * d, S.ripple.y * d, (now - S.ripple.t0) / 1000);
     else gl.uniform3f(U.uRipple, 0, 0, -1);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -737,11 +1030,13 @@ void main() {
     const m = await res.json();
     S.manifestBase = new URL(m.cdn || "./", abs).href;
     S.places = (m.places || []).filter((p) => p && p.video && Number.isFinite(p.lat) && Number.isFinite(p.lng));
+    S.moment = momentLabel(m.moment);
+    if (Array.isArray(m.threads)) for (const t of m.threads) if (t && t.id && t.title) S.threads.set(t.id, t);
   }
 
   async function boot() {
     const hasGL = initGL();
-    if (hasGL) for (const s of slots) s.tex = makeTex();
+    if (hasGL) { for (const s of slots) s.tex = makeTex(); vidTex = [makeTex(), makeTex()]; }
     else {
       document.documentElement.classList.add("no-gl");
       mapCv.id = "stage-2d";
@@ -750,6 +1045,7 @@ void main() {
       mapCv.addEventListener("pointerdown", onDown);
       mapCv.addEventListener("pointermove", onMove);
       mapCv.addEventListener("pointerup", onUp);
+      mapCv.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") S.pointer.inside = false; });
       els.stage = mapCv;
     }
     resize();
@@ -772,18 +1068,24 @@ void main() {
     updateHint();
 
     if (debugPlace) {
-      const q = project(debugPlace.lng, debugPlace.lat);
-      select(debugPlace, nearestCopyX(q.x, S.W / 2, S.view.s), q.y);
+      const q = screenOf(debugPlace, S.W / 2);
+      select(debugPlace, q.x, q.y);
     }
     if (params.has("hx")) {
       S.pointer = { x: +params.get("hx") * S.W, y: +(params.get("hy") || 0.5) * S.H, inside: true, type: "mouse" };
-      S.hole.x = S.pointer.x; S.hole.y = S.pointer.y;
+      S.hole.x = S.pointer.x; S.hole.y = S.pointer.y; S.lastMove = performance.now();
+    }
+    // Warm the lens: every poster, a few at a time, once the page is idle.
+    if (gl) {
+      const queue = S.places.slice();
+      const pump = () => { for (let i = 0; i < 3 && queue.length; i++) posterTex(queue.shift()); if (queue.length) setTimeout(pump, 400); };
+      setTimeout(pump, 1500);
     }
   }
 
   // Debug surface for verification scripts.
   window.__atlas = {
-    state: S, project, unproject, ym, latFromYm, cardView, worldView,
+    state: S, project, unproject, ym, latFromYm, cardView, worldView, screenOf, pickAt, preview, slots,
     cardRect: () => els.card.getBoundingClientRect(),
   };
 
