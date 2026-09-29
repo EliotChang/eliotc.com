@@ -635,7 +635,13 @@ void main() {
     if (t) return t[1];
     return v.length <= 16 ? v : "";
   }
-  const momentLabel = (m) => (typeof m === "string" ? m : m && typeof m === "object" ? (m.label || m.title || m.text || "") : "");
+  // moment may be an ISO instant ("2026-09-25T12:00:00Z") or a ready-made label.
+  function momentLabel(m) {
+    const v = typeof m === "string" ? m : m && typeof m === "object" ? (m.label || m.title || m.text || m.iso || "") : "";
+    const iso = v.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?Z$/);
+    if (iso) return `${fmtDate(iso[1])}, ${iso[2]} UTC`;
+    return /^\d{4}-\d{2}-\d{2}$/.test(v) ? fmtDate(v) : v;
+  }
   function placeThreads(place) {
     return (Array.isArray(place.threads) ? place.threads : []).map((id) => S.threads.get(id)).filter(Boolean);
   }
