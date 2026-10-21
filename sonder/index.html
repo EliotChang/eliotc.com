@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0f0f0e">
+<title>sonder.gg — Eliot Chang</title>
+<meta name="description" content="How sonder.gg went from text to a visual novel to generated film to comics drawn as you read, July to October 2026.">
+<meta property="og:title" content="sonder.gg — Eliot Chang">
+<meta property="og:description" content="Text, then a visual novel, then generated film, then comics drawn as you read.">
+<meta property="og:url" content="https://eliotc.com/sonder/">
+<meta property="og:image" content="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a4-read.webp">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👋</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f0f0e;
+  --raised: #171716;
+  --text: #efeee9;
+  --muted: rgba(239, 238, 233, 0.62);
+  --faint: rgba(239, 238, 233, 0.4);
+  --rule: rgba(239, 238, 233, 0.12);
+  --accent: #e8553a;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --gutter: 24px;
+  --wide: 1200px;
+  --column: 640px;
+}
+@media (max-width: 640px) { :root { --gutter: 16px; } }
+* { box-sizing: border-box; }
+html { background: var(--bg); scroll-padding-top: 72px; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 17px/1.6 "Instrument Sans", system-ui, sans-serif; letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; text-decoration-color: var(--faint); text-underline-offset: 3px; }
+a:hover { text-decoration-color: var(--text); }
+p { margin: 0; }
+.serif { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; letter-spacing: -0.01em; }
+.eyebrow { font-size: 12px; line-height: 1.4; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.wrap { width: min(var(--wide), 100% - 2 * var(--gutter)); margin-inline: auto; }
+
+/* Top bar */
+.bar {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--rule);
+}
+.bar .wrap { display: flex; align-items: center; gap: 24px; height: 52px; }
+.bar .home { font-weight: 500; text-decoration: none; white-space: nowrap; }
+.bar nav { display: flex; gap: 4px; margin-left: auto; overflow-x: auto; scrollbar-width: none; }
+.bar nav a {
+  font-size: 13px; color: var(--muted); text-decoration: none; padding: 6px 10px; border-radius: 999px; white-space: nowrap;
+  transition: color 0.2s var(--ease), background 0.2s var(--ease);
+}
+.bar nav a:hover { color: var(--text); }
+.bar nav a[aria-current="true"] { color: var(--text); background: var(--rule); }
+.bar nav a span { color: var(--faint); margin-right: 6px; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .bar nav a span { display: none; } .bar .home { display: none; } .bar nav { margin-left: 0; } }
+
+/* Header */
+header.intro { padding: 96px 0 56px; }
+header.intro h1 { font-size: clamp(56px, 11vw, 136px); line-height: 0.92; margin: 20px 0 0; }
+header.intro .lede { max-width: 760px; margin-top: 32px; font-size: clamp(20px, 2.4vw, 26px); line-height: 1.4; color: var(--text); }
+.meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--rule); }
+.meta dd { margin: 6px 0 0; font-size: 15px; line-height: 1.45; }
+@media (max-width: 860px) { .meta { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Four-up */
+.four { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.four figure { margin: 0; }
+.four .frame { aspect-ratio: 16 / 10; }
+.four .frame video, .four .frame img { height: 100%; object-fit: cover; }
+.four figcaption { margin-top: 8px; font-size: 13px; font-weight: 500; color: var(--text); }
+.four figcaption span { color: var(--faint); margin-right: 6px; font-variant-numeric: tabular-nums; }
+.four { row-gap: 20px; }
+@media (max-width: 640px) { .four { grid-template-columns: minmax(0, 1fr); } }
+.lead-caption { margin-top: 14px; max-width: var(--column); font-size: 14px; color: var(--muted); }
+
+/* Stats */
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 96px auto 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.stats div { padding: 24px 20px 24px 0; }
+.stats div + div { padding-left: 20px; border-left: 1px solid var(--rule); }
+.stats b { display: block; font-size: clamp(36px, 5vw, 56px); line-height: 1; }
+.stats span { display: block; margin-top: 10px; font-size: 14px; line-height: 1.4; color: var(--muted); }
+@media (max-width: 860px) {
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stats div:nth-child(3) { padding-left: 0; border-left: 0; }
+  .stats div:nth-child(n + 3) { border-top: 1px solid var(--rule); }
+}
+
+/* Prose blocks */
+section.block { padding-top: 120px; }
+.block h2 { font-size: clamp(40px, 6vw, 72px); line-height: 1; margin: 12px 0 0; }
+.prose { max-width: var(--column); }
+.prose p + p { margin-top: 1em; }
+.prose p { color: rgba(239, 238, 233, 0.86); }
+
+/* Acts */
+.act { padding-top: 140px; }
+.act-head { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; align-items: start; }
+.act-num { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.act-num b { display: block; font-family: "Instrument Serif", Georgia, serif; font-weight: 400; font-size: 88px; line-height: 0.85; color: var(--text); margin-bottom: 14px; }
+.act-num .form { display: block; color: var(--text); font-size: 15px; font-weight: 500; margin-bottom: 2px; }
+.act h2 { font-size: clamp(44px, 6.5vw, 84px); line-height: 0.98; margin: 0; }
+.act .bet { margin-top: 20px; max-width: 760px; font-size: clamp(19px, 2vw, 23px); line-height: 1.45; }
+.act-body { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; margin-top: 40px; }
+.act-body > .prose { grid-column: 2; }
+@media (max-width: 860px) {
+  .act-head, .act-body { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .act-body > .prose { grid-column: 1; }
+  .act-num b { font-size: 64px; }
+}
+
+.wall { grid-column: 2; max-width: var(--column); margin-top: 8px; padding: 20px 22px; border-radius: 12px; background: var(--raised); border: 1px solid var(--rule); }
+.wall .eyebrow { color: var(--accent); }
+.wall p:not(.eyebrow) { margin-top: 8px; font-size: 18px; line-height: 1.5; }
+@media (max-width: 860px) { .wall { grid-column: 1; } }
+
+.numbers { grid-column: 2; display: flex; flex-wrap: wrap; gap: 12px 40px; margin: 0; }
+.numbers div { min-width: 140px; }
+.numbers dt { font-size: 32px; line-height: 1.1; font-family: "Instrument Serif", Georgia, serif; }
+.numbers dd { margin: 4px 0 0; font-size: 14px; color: var(--muted); max-width: 22ch; line-height: 1.4; }
+@media (max-width: 860px) { .numbers { grid-column: 1; } }
+
+/* Media */
+.media { margin-top: 56px; display: grid; gap: 40px; }
+figure { margin: 0; }
+.frame { overflow: hidden; border-radius: 10px; background: var(--raised); box-shadow: 0 0 0 1px var(--rule); }
+.frame img, .frame video { display: block; width: 100%; height: auto; }
+figcaption { margin-top: 12px; max-width: var(--column); font-size: 14px; line-height: 1.5; color: var(--muted); }
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.pair.phones { grid-template-columns: repeat(2, minmax(0, 260px)); justify-content: start; }
+@media (max-width: 640px) { .pair { grid-template-columns: minmax(0, 1fr); } .pair.phones { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.narrow { max-width: 832px; }
+
+/* Constants */
+.constants { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 48px; margin-top: 40px; max-width: 960px; }
+.constants div { border-top: 1px solid var(--rule); padding-top: 16px; }
+.constants h3 { margin: 0; font-size: 17px; font-weight: 600; }
+.constants p { margin-top: 6px; color: var(--muted); font-size: 16px; line-height: 1.55; }
+@media (max-width: 640px) { .constants { grid-template-columns: minmax(0, 1fr); } }
+
+footer { margin-top: 160px; padding: 32px 0 48px; border-top: 1px solid var(--rule); }
+footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; font-size: 14px; color: var(--muted); }
+footer nav { display: flex; gap: 20px; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="wrap">
+    <a class="home" href="/">eliot</a>
+    <nav aria-label="Acts">
+      <a href="#text"><span>01</span>Text</a>
+      <a href="#visual-novel"><span>02</span>Visual novel</a>
+      <a href="#film"><span>03</span>Film</a>
+      <a href="#comics"><span>04</span>Comics</a>
+    </nav>
+  </div>
+</div>
+
+<main>
+  <header class="intro wrap">
+    <p class="eyebrow">Figment · 2026</p>
+    <h1 class="serif">sonder.gg</h1>
+    <p class="lede">Live any life: pick a place and a year, and spend a day as someone who could have lived there. Since July the idea hasn’t moved, but the form has changed three times, from text to a visual novel, then to generated film, and now to comics drawn as you read.</p>
+    <dl class="meta">
+      <div><dt class="eyebrow">Role</dt><dd>Co-founder, chief product officer</dd></div>
+      <div><dt class="eyebrow">Team</dt><dd>Figment, a small team directing coding agents</dd></div>
+      <div><dt class="eyebrow">Timeline</dt><dd>July – October 2026</dd></div>
+      <div><dt class="eyebrow">Live</dt><dd><a href="https://sonder.gg">sonder.gg</a> (comics)<br><a href="https://stage.sonder.gg">stage.sonder.gg</a> (visual novel)</dd></div>
+    </dl>
+  </header>
+
+  <section class="wrap" aria-label="One life, four ways">
+    <div class="four">
+      <figure>
+        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/w-text.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/w-text.mp4" aria-label="Warin's morning as prose: the split quill, Anselm's line, and two choices, with a third typed in"></video></div>
+        <figcaption><span>01</span>Text</figcaption>
+      </figure>
+      <figure>
+        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/w-stage.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/w-stage.mp4" aria-label="Warin and Anselm as cel-animated figures in a painted canvas pavilion, the narration line advancing"></video></div>
+        <figcaption><span>02</span>Visual novel</figcaption>
+      </figure>
+      <figure>
+        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a3-runnymede.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a3-runnymede.mp4" aria-label="Generated anime film: Warin holds up his split quill to the senior clerk by lantern light"></video></div>
+        <figcaption><span>03</span>Film</figcaption>
+      </figure>
+      <figure>
+        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a4-warin.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a4-warin.mp4" aria-label="Comic pages of Warin in the clerks' tent, ending on a choice: ask the senior clerk for a quill, or start collating"></video></div>
+        <figcaption><span>04</span>Comic</figcaption>
+      </figure>
+    </div>
+    <p class="lead-caption">One life, four ways. Warin of Guildford, a chancery clerk at Runnymede on 15 June 1215, has forty clauses to copy and a split quill. Text, visual novel and comic recorded October 21 on today’s sonder; the film is from September 23.</p>
+
+    <div class="stats">
+      <div><b class="serif">4</b><span>forms in sixteen weeks</span></div>
+      <div><b class="serif">3,516</b><span>commits since July 1</span></div>
+      <div><b class="serif">756</b><span>pull requests merged</span></div>
+      <div><b class="serif">12–17s</b><span>from a line of dialogue to its painted panel, today</span></div>
+    </div>
+  </section>
+
+  <!-- 01 Text -->
+  <section class="act wrap" id="text" aria-labelledby="text-title">
+    <div class="act-head">
+      <p class="act-num"><b>01</b><span class="form">Text</span>Jul 1 – Jul 16</p>
+      <div>
+        <h2 class="serif" id="text-title">Be someone</h2>
+        <p class="bet">Click a country and a year and you’re dealt people who could have lived there. Pick one, and their day streams in as prose, a scene at a time, each ending on a choice.</p>
+      </div>
+    </div>
+    <div class="act-body">
+      <div class="prose">
+        <p>It began as a choose-your-own-adventure engine with a command-line player. Within ten days it had a day loop with memory and a five-act shape, a shared scene cache so readers who make the same choice share a story, free-text actions, and five “day grammars” for different kinds of day.</p>
+        <p>Improvised pacing broke almost at once. One afternoon ran to 38 scenes; one farmer got seven names in a single day. So the day began to be dealt ahead of time: a planned set of people, places and questions that the writer then performs.</p>
+      </div>
+      <div class="wall">
+        <p class="eyebrow">What broke</p>
+        <p>Reading about a day didn’t put you in it. Every scene already carried a painted still, and the stills were doing the work of making it a place.</p>
+      </div>
+    </div>
+    <div class="media">
+      <figure class="narrow">
+        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/w-text.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/w-text.mp4" aria-label="Warin's morning as prose, ending on two choices and a line typed in the reader's own words"></video></div>
+        <figcaption>Warin’s day in the reading view: today’s engine with the stage closed, the closest thing to the July product that still runs. Two choices, or your own words.</figcaption>
+      </figure>
+      <div class="pair">
+        <figure>
+          <div class="frame"><img src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a1-picker.webp" alt="Gabon, 2025: the year deals ten lives, listed beside the globe" loading="lazy"></div>
+          <figcaption>Gabon, 2025. The year deals you ten lives to choose from.</figcaption>
+        </figure>
+        <figure>
+          <div class="frame"><img src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a1-scene.webp" alt="Oil-painted still: a flower seller with red carnations faces a soldier in a market" loading="lazy"></div>
+          <figcaption>One painted still per scene, from July 6.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 Visual novel -->
+  <section class="act wrap" id="visual-novel" aria-labelledby="vn-title">
+    <div class="act-head">
+      <p class="act-num"><b>02</b><span class="form">Visual novel</span>Jul 15 – Sep 23</p>
+      <div>
+        <h2 class="serif" id="vn-title">Put them on a stage</h2>
+        <p class="bet">Painted backgrounds for places, cel-animated actors for people, every line voiced, and a deck of choices written in the character’s own voice.</p>
+      </div>
+    </div>
+    <div class="act-body">
+      <div class="prose">
+        <p>The art direction was Satoshi Kon’s <i>Paprika</i>: cel figures over painted plates. The cast moved into a database with generated expressions, the writer started directing the actors, and each character got a voice, with lip-sync following their emotional state. It shipped on the web on July 23 and on iOS in September.</p>
+        <p>This was the busiest stretch. Most of the design happened in writing: briefs, rules, and a design doc corrected as live replays turned things up. Once it was playable, it had to look like a visual novel, with models, backgrounds and dialogue boxes.</p>
+      </div>
+      <div class="wall">
+        <p class="eyebrow">What broke</p>
+        <p>Action is contact between layers. A figure from one generated image can’t lean on a desk from another, because they come from two painters with no shared reference.</p>
+      </div>
+    </div>
+    <div class="media">
+      <figure>
+        <div class="frame"><img src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a2-bridge.webp" alt="A text panel on the left; two cel-animated men in a painted Danish clockmaker's shop on the right" loading="lazy"></div>
+        <figcaption>July 24. The text moves to the side and the stage takes the room.</figcaption>
+      </figure>
+      <figure>
+        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a2-stage.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a2-stage.mp4" aria-label="Visual novel session: a voiced line, a choice deck of three moves, then the player types their own line and the scene answers"></video></div>
+        <figcaption>A real signed-out session, September 11. The line is voiced, the deck deals three moves, and you can type your own.</figcaption>
+      </figure>
+      <div class="pair phones">
+        <figure>
+          <div class="frame"><img src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a2-ios-scene.webp" alt="iPhone: Galileo's workshop scene with dialogue" loading="lazy"></div>
+        </figure>
+        <figure>
+          <div class="frame"><img src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a2-ios-deck.webp" alt="iPhone: the choice deck in Galileo's workshop" loading="lazy"></div>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 Film -->
+  <section class="act wrap" id="film" aria-labelledby="film-title">
+    <div class="act-head">
+      <p class="act-num"><b>03</b><span class="form">Film</span>Sep 23 – Oct 4</p>
+      <div>
+        <h2 class="serif" id="film-title">One painter</h2>
+        <p class="bet">Make the whole stage a film. A writer plans each five-to-eight-second shot, and MiniMax H3 renders it starting from the last frame of the shot before, so the person and the desk come from the same painting.</p>
+      </div>
+    </div>
+    <div class="act-body">
+      <dl class="numbers">
+        <div><dt>3–5s</dt><dd>to render a six-second shot, measured Sep 23</dd></div>
+        <div><dt>$1.50</dt><dd>per generated minute</dd></div>
+        <div><dt>$15–20</dt><dd>to film one reader’s whole day</dd></div>
+      </dl>
+      <div class="prose">
+        <p>On September 2, a survey of video models concluded that real-time video wasn’t ready for the story. Three weeks later H3 rendered a six-second shot faster than you could read it, and the plan changed within a day.</p>
+        <p>The life film played a whole day with a fork at each decision: two options and “something else,” on a timer. It opened as a closed alpha for streamers, because one render watched by a whole chat costs a fraction per viewer. By October 3 a film of Eeyore’s Birthday was the front door.</p>
+      </div>
+      <div class="wall">
+        <p class="eyebrow">What broke</p>
+        <p>A personal render per reader doesn’t pay for itself. The picture wouldn’t hold either: the model drifted toward Disney’s bear within two clips. And a film sets its own pace, so the reader can only wait.</p>
+      </div>
+    </div>
+    <div class="media">
+      <figure>
+        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a3-runnymede.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a3-runnymede.mp4" aria-label="Generated film: two clerks copy the charter by lantern light at Runnymede"></video></div>
+        <figcaption>Runnymede, 1215. “Master Gervase. My quill split.” The opening shots of a life film.</figcaption>
+      </figure>
+      <figure>
+        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a3-fork.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a3-fork.mp4" aria-label="Generated film: Apollo 11 mission control, a program alarm, and a go or abort choice over the shot"></video></div>
+        <figcaption>A program alarm in mission control, 1969. The fork plays over the shot, on a timer.</figcaption>
+      </figure>
+      <figure class="narrow">
+        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a3-eeyore-film.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a3-eeyore-film.mp4" aria-label="Generated watercolour film: Pooh finds Eeyore by the stream"></video></div>
+        <figcaption>Eeyore’s Birthday as a film, October 3.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- 04 Comics -->
+  <section class="act wrap" id="comics" aria-labelledby="comics-title">
+    <div class="act-head">
+      <p class="act-num"><b>04</b><span class="form">Comics</span>Oct 5 – now</p>
+      <div>
+        <h2 class="serif" id="comics-title">Drawn as you read</h2>
+        <p class="bet">Paint still pictures, letter them in code, and let the reader turn the page.</p>
+      </div>
+    </div>
+    <div class="act-body">
+      <dl class="numbers">
+        <div><dt>12–17s</dt><dd>from a line to its painted panel, down from 65–115s</dd></div>
+        <div><dt>110 / 112</dt><dd>takes with the cast on model</dd></div>
+        <div><dt>$0.19</dt><dd>to write a late page, down from $0.86</dd></div>
+      </dl>
+      <div class="prose">
+        <p>It started on October 5 with <i>The Rent</i>, a <i>Nathan for You</i> parody drawn live. A day later every life on sonder.gg read as a comic, eight pages in four acts. The pictures are painted with no words in them. The lettering is code, which finds the faces so balloons stay off them and tails point at whoever is speaking.</p>
+        <p>Before a panel is shown, two separate looks check it for a missing or extra character, someone off model or off style, stray marks, or the wrong action. A slip buys one retake, and you see the take with the fewest slips. <i>Eeyore’s Birthday</i> is Milne’s chapter six, written past the book; at each decision the deck offers two roads, a line of your own, or the end.</p>
+        <p>Since October 15 a comic can also start from a concept instead of a life. The writer plans the whole story first, then writes the next stretch while the current panels paint.</p>
+      </div>
+    </div>
+    <div class="media">
+      <figure>
+        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a4-read.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a4-read.mp4" aria-label="Eeyore's Birthday: page one paints in, the reader scrolls to the deck, picks the moon's reflection in a jar, and page two follows"></video></div>
+        <figcaption>Eeyore’s Birthday, recorded October 21. Page one, the deck, and a road taken. Roads off the deck are painted ahead, so the next page is already there.</figcaption>
+      </figure>
+      <figure>
+        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a4-write.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a4-write.mp4" aria-label="A reader types their own line into Eeyore's Birthday; the balloons are lettered first, then Pooh and Eeyore are painted beneath them, and the Every road sidebar opens"></video></div>
+        <figcaption>A line of your own: “Pooh gives him a heart-shaped pebble from the stream.” The words are lettered first and the paintings arrive underneath them; the wait for the writer and painter runs at 4× speed. Then the Every road sidebar, with the next fork.</figcaption>
+      </figure>
+      <figure>
+        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a4-make.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a4-make.mp4" aria-label="A concept comic made from a typed idea about a lighthouse keeper; mid-story the reader adds a direction, and his daughter rows out through the storm"></video></div>
+        <figcaption>A concept comic from one line: “A lighthouse keeper’s last night before the lamp goes electric.” Read a panel at a time; halfway through, a direction typed at the foot of the page (“His daughter rows out through the storm”) is in the story a few panels later. The wait for the first panel runs at 4× speed.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="block wrap" aria-labelledby="constants-title">
+    <p class="eyebrow">Across all four</p>
+    <h2 class="serif" id="constants-title">What stayed the same</h2>
+    <div class="constants">
+      <div><h3>A place, a year, an ordinary person</h3><p>History sets the constraints. You choose what they do.</p></div>
+      <div><h3>The deck</h3><p>Choices are written in the character’s voice, with room to write your own.</p></div>
+      <div><h3>The picture follows the story</h3><p>Generation never holds the text up. That’s why roads are painted before you pick one.</p></div>
+      <div><h3>One painter</h3><p>Each new form fixed the last one’s continuity: the stage over loose stills, film over the stage’s seams, a checked panel over a drifting film.</p></div>
+    </div>
+  </section>
+
+  <section class="block wrap" aria-labelledby="built-title">
+    <p class="eyebrow">Process</p>
+    <h2 class="serif" id="built-title">How it was built</h2>
+    <div class="prose" style="margin-top: 28px">
+      <p>sonder is built by a small team directing a lot of coding agents: 3,516 commits and 756 merged pull requests since July 1, and 1,034 commits since comics began on October 5. My job is less drawing screens and more deciding what’s true about the product, catching what’s wrong in live replays, and writing it down precisely enough that the next hundred commits follow it.</p>
+      <p>That’s also why the form could change three times in four months. Undoing things was cheap. The expensive part was knowing what to undo.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>eliot chang · <a href="mailto:me@eliotc.com">me@eliotc.com</a></span>
+    <nav><a href="https://sonder.gg">sonder.gg</a><a href="/">eliotc.com</a></nav>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches
+  const loops = document.querySelectorAll("video[data-loop]")
+  if (reduced) {
+    loops.forEach((v) => { v.controls = true })
+  } else {
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) e.target.play().catch(() => {})
+        else e.target.pause()
+      }
+    }, { threshold: 0.2 })
+    loops.forEach((v) => io.observe(v))
+  }
+
+  const links = [...document.querySelectorAll(".bar nav a")]
+  const acts = links.map((a) => document.querySelector(a.getAttribute("href")))
+  const spy = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue
+      links.forEach((a) => a.setAttribute("aria-current", String(a.getAttribute("href") === `#${e.target.id}`)))
+    }
+  }, { rootMargin: "-45% 0px -50% 0px" })
+  acts.forEach((s) => s && spy.observe(s))
+})()
+</script>
+</body>
+</html>

@@ -1,3 +1,5 @@
 .review/
 .DS_Store
 .env.local
+.case-study/
+sonder/media/
