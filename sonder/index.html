@@ -4,419 +4,370 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#0f0f0e">
-<title>sonder.gg — Eliot Chang</title>
-<meta name="description" content="How sonder.gg went from text to a visual novel to generated film to comics drawn as you read, July to October 2026.">
-<meta property="og:title" content="sonder.gg — Eliot Chang">
-<meta property="og:description" content="Text, then a visual novel, then generated film, then comics drawn as you read.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f3f1eb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f0f0e" media="(prefers-color-scheme: dark)">
+<title>Sonder — Eliot Chang</title>
+<meta name="description" content="One idea, explored in four formats. How our team built Sonder, from a history reader to playable stories in text, visual novels, film, and comics.">
+<link rel="canonical" href="https://eliotc.com/sonder/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Sonder — Eliot Chang">
+<meta property="og:description" content="Live any life. One idea, explored in text, visual novels, film, and comics.">
 <meta property="og:url" content="https://eliotc.com/sonder/">
-<meta property="og:image" content="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a4-read.webp">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👋</text></svg>">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
-<style>
-:root {
-  --bg: #0f0f0e;
-  --raised: #171716;
-  --text: #efeee9;
-  --muted: rgba(239, 238, 233, 0.62);
-  --faint: rgba(239, 238, 233, 0.4);
-  --rule: rgba(239, 238, 233, 0.12);
-  --accent: #e8553a;
-  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --gutter: 24px;
-  --wide: 1200px;
-  --column: 640px;
-}
-@media (max-width: 640px) { :root { --gutter: 16px; } }
-* { box-sizing: border-box; }
-html { background: var(--bg); scroll-padding-top: 72px; }
-body {
-  margin: 0; background: var(--bg); color: var(--text);
-  font: 17px/1.6 "Instrument Sans", system-ui, sans-serif; letter-spacing: -0.005em;
-  -webkit-font-smoothing: antialiased;
-}
-a { color: inherit; text-decoration-color: var(--faint); text-underline-offset: 3px; }
-a:hover { text-decoration-color: var(--text); }
-p { margin: 0; }
-.serif { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; letter-spacing: -0.01em; }
-.eyebrow { font-size: 12px; line-height: 1.4; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
-.wrap { width: min(var(--wide), 100% - 2 * var(--gutter)); margin-inline: auto; }
-
-/* Top bar */
-.bar {
-  position: sticky; top: 0; z-index: 10;
-  background: color-mix(in srgb, var(--bg) 86%, transparent);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--rule);
-}
-.bar .wrap { display: flex; align-items: center; gap: 24px; height: 52px; }
-.bar .home { font-weight: 500; text-decoration: none; white-space: nowrap; }
-.bar nav { display: flex; gap: 4px; margin-left: auto; overflow-x: auto; scrollbar-width: none; }
-.bar nav a {
-  font-size: 13px; color: var(--muted); text-decoration: none; padding: 6px 10px; border-radius: 999px; white-space: nowrap;
-  transition: color 0.2s var(--ease), background 0.2s var(--ease);
-}
-.bar nav a:hover { color: var(--text); }
-.bar nav a[aria-current="true"] { color: var(--text); background: var(--rule); }
-.bar nav a span { color: var(--faint); margin-right: 6px; font-variant-numeric: tabular-nums; }
-@media (max-width: 640px) { .bar nav a span { display: none; } .bar .home { display: none; } .bar nav { margin-left: 0; } }
-
-/* Header */
-header.intro { padding: 96px 0 56px; }
-header.intro h1 { font-size: clamp(56px, 11vw, 136px); line-height: 0.92; margin: 20px 0 0; }
-header.intro .lede { max-width: 760px; margin-top: 32px; font-size: clamp(20px, 2.4vw, 26px); line-height: 1.4; color: var(--text); }
-.meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--rule); }
-.meta dd { margin: 6px 0 0; font-size: 15px; line-height: 1.45; }
-@media (max-width: 860px) { .meta { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-
-/* Four-up */
-.four { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.four figure { margin: 0; }
-.four .frame { aspect-ratio: 16 / 10; }
-.four .frame video, .four .frame img { height: 100%; object-fit: cover; }
-.four figcaption { margin-top: 8px; font-size: 13px; font-weight: 500; color: var(--text); }
-.four figcaption span { color: var(--faint); margin-right: 6px; font-variant-numeric: tabular-nums; }
-.four { row-gap: 20px; }
-@media (max-width: 640px) { .four { grid-template-columns: minmax(0, 1fr); } }
-.lead-caption { margin-top: 14px; max-width: var(--column); font-size: 14px; color: var(--muted); }
-
-/* Stats */
-.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 96px auto 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
-.stats div { padding: 24px 20px 24px 0; }
-.stats div + div { padding-left: 20px; border-left: 1px solid var(--rule); }
-.stats b { display: block; font-size: clamp(36px, 5vw, 56px); line-height: 1; }
-.stats span { display: block; margin-top: 10px; font-size: 14px; line-height: 1.4; color: var(--muted); }
-@media (max-width: 860px) {
-  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .stats div:nth-child(3) { padding-left: 0; border-left: 0; }
-  .stats div:nth-child(n + 3) { border-top: 1px solid var(--rule); }
-}
-
-/* Prose blocks */
-section.block { padding-top: 120px; }
-.block h2 { font-size: clamp(40px, 6vw, 72px); line-height: 1; margin: 12px 0 0; }
-.prose { max-width: var(--column); }
-.prose p + p { margin-top: 1em; }
-.prose p { color: rgba(239, 238, 233, 0.86); }
-
-/* Acts */
-.act { padding-top: 140px; }
-.act-head { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; align-items: start; }
-.act-num { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.act-num b { display: block; font-family: "Instrument Serif", Georgia, serif; font-weight: 400; font-size: 88px; line-height: 0.85; color: var(--text); margin-bottom: 14px; }
-.act-num .form { display: block; color: var(--text); font-size: 15px; font-weight: 500; margin-bottom: 2px; }
-.act h2 { font-size: clamp(44px, 6.5vw, 84px); line-height: 0.98; margin: 0; }
-.act .bet { margin-top: 20px; max-width: 760px; font-size: clamp(19px, 2vw, 23px); line-height: 1.45; }
-.act-body { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; margin-top: 40px; }
-.act-body > .prose { grid-column: 2; }
-@media (max-width: 860px) {
-  .act-head, .act-body { grid-template-columns: minmax(0, 1fr); gap: 20px; }
-  .act-body > .prose { grid-column: 1; }
-  .act-num b { font-size: 64px; }
-}
-
-.wall { grid-column: 2; max-width: var(--column); margin-top: 8px; padding: 20px 22px; border-radius: 12px; background: var(--raised); border: 1px solid var(--rule); }
-.wall .eyebrow { color: var(--accent); }
-.wall p:not(.eyebrow) { margin-top: 8px; font-size: 18px; line-height: 1.5; }
-@media (max-width: 860px) { .wall { grid-column: 1; } }
-
-.numbers { grid-column: 2; display: flex; flex-wrap: wrap; gap: 12px 40px; margin: 0; }
-.numbers div { min-width: 140px; }
-.numbers dt { font-size: 32px; line-height: 1.1; font-family: "Instrument Serif", Georgia, serif; }
-.numbers dd { margin: 4px 0 0; font-size: 14px; color: var(--muted); max-width: 22ch; line-height: 1.4; }
-@media (max-width: 860px) { .numbers { grid-column: 1; } }
-
-/* Media */
-.media { margin-top: 56px; display: grid; gap: 40px; }
-figure { margin: 0; }
-.frame { overflow: hidden; border-radius: 10px; background: var(--raised); box-shadow: 0 0 0 1px var(--rule); }
-.frame img, .frame video { display: block; width: 100%; height: auto; }
-figcaption { margin-top: 12px; max-width: var(--column); font-size: 14px; line-height: 1.5; color: var(--muted); }
-.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
-.pair.phones { grid-template-columns: repeat(2, minmax(0, 260px)); justify-content: start; }
-@media (max-width: 640px) { .pair { grid-template-columns: minmax(0, 1fr); } .pair.phones { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.narrow { max-width: 832px; }
-
-/* Constants */
-.constants { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 48px; margin-top: 40px; max-width: 960px; }
-.constants div { border-top: 1px solid var(--rule); padding-top: 16px; }
-.constants h3 { margin: 0; font-size: 17px; font-weight: 600; }
-.constants p { margin-top: 6px; color: var(--muted); font-size: 16px; line-height: 1.55; }
-@media (max-width: 640px) { .constants { grid-template-columns: minmax(0, 1fr); } }
-
-footer { margin-top: 160px; padding: 32px 0 48px; border-top: 1px solid var(--rule); }
-footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; font-size: 14px; color: var(--muted); }
-footer nav { display: flex; gap: 20px; }
-
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-</style>
+<meta property="og:image" content="https://eliotc.com/sonder/assets/loops/a4-read.webp">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E👋%3C/text%3E%3C/svg%3E">
+<link rel="preload" href="assets/bricolage-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="sonder.css">
+<script src="sonder.js" defer></script>
 </head>
 <body>
-
-<div class="bar">
-  <div class="wrap">
-    <a class="home" href="/">eliot</a>
-    <nav aria-label="Acts">
-      <a href="#text"><span>01</span>Text</a>
-      <a href="#visual-novel"><span>02</span>Visual novel</a>
-      <a href="#film"><span>03</span>Film</a>
-      <a href="#comics"><span>04</span>Comics</a>
-    </nav>
+<a href="#content" class="skip-link">Skip to content</a>
+<header class="site-header">
+  <div class="site-header-inner">
+    <a class="site-brand" href="/" aria-label="Eliot Chang, home"><span class="brand-dot" aria-hidden="true"></span><span>Eliot Chang</span></a>
+    <nav aria-label="Main navigation"><a href="/">Home</a><a href="https://docs.google.com/document/d/1Gn257Oo2Tdrnf8u51dKeGFQw_ZbxBJLO6IESc3gNT_4/edit">Résumé</a><a class="site-email" href="mailto:me@eliotc.com">Email</a></nav>
   </div>
+</header>
+<main id="content">
+<article class="sonder-story sonder-case-study">
+<header class="sonder-header"><p class="eyebrow"><a href="/">Work</a> / Figment · 2026</p>
+<div class="sonder-title-row">
+<div><p class="sonder-wordmark">sonder.gg</p>
+<h1>Live any life.</h1>
 </div>
-
-<main>
-  <header class="intro wrap">
-    <p class="eyebrow">Figment · 2026</p>
-    <h1 class="serif">sonder.gg</h1>
-    <p class="lede">Live any life: pick a place and a year, and spend a day as someone who could have lived there. Since July the idea hasn’t moved, but the form has changed three times, from text to a visual novel, then to generated film, and now to comics drawn as you read.</p>
-    <dl class="meta">
-      <div><dt class="eyebrow">Role</dt><dd>Co-founder, chief product officer</dd></div>
-      <div><dt class="eyebrow">Team</dt><dd>Figment, a small team directing coding agents</dd></div>
-      <div><dt class="eyebrow">Timeline</dt><dd>July – October 2026</dd></div>
-      <div><dt class="eyebrow">Live</dt><dd><a href="https://sonder.gg">sonder.gg</a> (comics)<br><a href="https://stage.sonder.gg">stage.sonder.gg</a> (visual novel)</dd></div>
-    </dl>
-  </header>
-
-  <section class="wrap" aria-label="One life, four ways">
-    <div class="four">
-      <figure>
-        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/w-text.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/w-text.mp4" aria-label="Warin's morning as prose: the split quill, Anselm's line, and two choices, with a third typed in"></video></div>
-        <figcaption><span>01</span>Text</figcaption>
-      </figure>
-      <figure>
-        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/w-stage.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/w-stage.mp4" aria-label="Warin and Anselm as cel-animated figures in a painted canvas pavilion, the narration line advancing"></video></div>
-        <figcaption><span>02</span>Visual novel</figcaption>
-      </figure>
-      <figure>
-        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a3-runnymede.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a3-runnymede.mp4" aria-label="Generated anime film: Warin holds up his split quill to the senior clerk by lantern light"></video></div>
-        <figcaption><span>03</span>Film</figcaption>
-      </figure>
-      <figure>
-        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a4-warin.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a4-warin.mp4" aria-label="Comic pages of Warin in the clerks' tent, ending on a choice: ask the senior clerk for a quill, or start collating"></video></div>
-        <figcaption><span>04</span>Comic</figcaption>
-      </figure>
-    </div>
-    <p class="lead-caption">One life, four ways. Warin of Guildford, a chancery clerk at Runnymede on 15 June 1215, has forty clauses to copy and a split quill. Text, visual novel and comic recorded October 21 on today’s sonder; the film is from September 23.</p>
-
-    <div class="stats">
-      <div><b class="serif">4</b><span>forms in sixteen weeks</span></div>
-      <div><b class="serif">3,516</b><span>commits since July 1</span></div>
-      <div><b class="serif">756</b><span>pull requests merged</span></div>
-      <div><b class="serif">12–17s</b><span>from a line of dialogue to its painted panel, today</span></div>
-    </div>
-  </section>
-
-  <!-- 01 Text -->
-  <section class="act wrap" id="text" aria-labelledby="text-title">
-    <div class="act-head">
-      <p class="act-num"><b>01</b><span class="form">Text</span>Jul 1 – Jul 16</p>
-      <div>
-        <h2 class="serif" id="text-title">Be someone</h2>
-        <p class="bet">Click a country and a year and you’re dealt people who could have lived there. Pick one, and their day streams in as prose, a scene at a time, each ending on a choice.</p>
-      </div>
-    </div>
-    <div class="act-body">
-      <div class="prose">
-        <p>It began as a choose-your-own-adventure engine with a command-line player. Within ten days it had a day loop with memory and a five-act shape, a shared scene cache so readers who make the same choice share a story, free-text actions, and five “day grammars” for different kinds of day.</p>
-        <p>Improvised pacing broke almost at once. One afternoon ran to 38 scenes; one farmer got seven names in a single day. So the day began to be dealt ahead of time: a planned set of people, places and questions that the writer then performs.</p>
-      </div>
-      <div class="wall">
-        <p class="eyebrow">What broke</p>
-        <p>Reading about a day didn’t put you in it. Every scene already carried a painted still, and the stills were doing the work of making it a place.</p>
-      </div>
-    </div>
-    <div class="media">
-      <figure class="narrow">
-        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/w-text.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/w-text.mp4" aria-label="Warin's morning as prose, ending on two choices and a line typed in the reader's own words"></video></div>
-        <figcaption>Warin’s day in the reading view: today’s engine with the stage closed, the closest thing to the July product that still runs. Two choices, or your own words.</figcaption>
-      </figure>
-      <div class="pair">
-        <figure>
-          <div class="frame"><img src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a1-picker.webp" alt="Gabon, 2025: the year deals ten lives, listed beside the globe" loading="lazy"></div>
-          <figcaption>Gabon, 2025. The year deals you ten lives to choose from.</figcaption>
-        </figure>
-        <figure>
-          <div class="frame"><img src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a1-scene.webp" alt="Oil-painted still: a flower seller with red carnations faces a soldier in a market" loading="lazy"></div>
-          <figcaption>One painted still per scene, from July 6.</figcaption>
-        </figure>
-      </div>
-    </div>
-  </section>
-
-  <!-- 02 Visual novel -->
-  <section class="act wrap" id="visual-novel" aria-labelledby="vn-title">
-    <div class="act-head">
-      <p class="act-num"><b>02</b><span class="form">Visual novel</span>Jul 15 – Sep 23</p>
-      <div>
-        <h2 class="serif" id="vn-title">Put them on a stage</h2>
-        <p class="bet">Painted backgrounds for places, cel-animated actors for people, every line voiced, and a deck of choices written in the character’s own voice.</p>
-      </div>
-    </div>
-    <div class="act-body">
-      <div class="prose">
-        <p>The art direction was Satoshi Kon’s <i>Paprika</i>: cel figures over painted plates. The cast moved into a database with generated expressions, the writer started directing the actors, and each character got a voice, with lip-sync following their emotional state. It shipped on the web on July 23 and on iOS in September.</p>
-        <p>This was the busiest stretch. Most of the design happened in writing: briefs, rules, and a design doc corrected as live replays turned things up. Once it was playable, it had to look like a visual novel, with models, backgrounds and dialogue boxes.</p>
-      </div>
-      <div class="wall">
-        <p class="eyebrow">What broke</p>
-        <p>Action is contact between layers. A figure from one generated image can’t lean on a desk from another, because they come from two painters with no shared reference.</p>
-      </div>
-    </div>
-    <div class="media">
-      <figure>
-        <div class="frame"><img src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a2-bridge.webp" alt="A text panel on the left; two cel-animated men in a painted Danish clockmaker's shop on the right" loading="lazy"></div>
-        <figcaption>July 24. The text moves to the side and the stage takes the room.</figcaption>
-      </figure>
-      <figure>
-        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a2-stage.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a2-stage.mp4" aria-label="Visual novel session: a voiced line, a choice deck of three moves, then the player types their own line and the scene answers"></video></div>
-        <figcaption>A real signed-out session, September 11. The line is voiced, the deck deals three moves, and you can type your own.</figcaption>
-      </figure>
-      <div class="pair phones">
-        <figure>
-          <div class="frame"><img src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a2-ios-scene.webp" alt="iPhone: Galileo's workshop scene with dialogue" loading="lazy"></div>
-        </figure>
-        <figure>
-          <div class="frame"><img src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a2-ios-deck.webp" alt="iPhone: the choice deck in Galileo's workshop" loading="lazy"></div>
-        </figure>
-      </div>
-    </div>
-  </section>
-
-  <!-- 03 Film -->
-  <section class="act wrap" id="film" aria-labelledby="film-title">
-    <div class="act-head">
-      <p class="act-num"><b>03</b><span class="form">Film</span>Sep 23 – Oct 4</p>
-      <div>
-        <h2 class="serif" id="film-title">One painter</h2>
-        <p class="bet">Make the whole stage a film. A writer plans each five-to-eight-second shot, and MiniMax H3 renders it starting from the last frame of the shot before, so the person and the desk come from the same painting.</p>
-      </div>
-    </div>
-    <div class="act-body">
-      <dl class="numbers">
-        <div><dt>3–5s</dt><dd>to render a six-second shot, measured Sep 23</dd></div>
-        <div><dt>$1.50</dt><dd>per generated minute</dd></div>
-        <div><dt>$15–20</dt><dd>to film one reader’s whole day</dd></div>
-      </dl>
-      <div class="prose">
-        <p>On September 2, a survey of video models concluded that real-time video wasn’t ready for the story. Three weeks later H3 rendered a six-second shot faster than you could read it, and the plan changed within a day.</p>
-        <p>The life film played a whole day with a fork at each decision: two options and “something else,” on a timer. It opened as a closed alpha for streamers, because one render watched by a whole chat costs a fraction per viewer. By October 3 a film of Eeyore’s Birthday was the front door.</p>
-      </div>
-      <div class="wall">
-        <p class="eyebrow">What broke</p>
-        <p>A personal render per reader doesn’t pay for itself. The picture wouldn’t hold either: the model drifted toward Disney’s bear within two clips. And a film sets its own pace, so the reader can only wait.</p>
-      </div>
-    </div>
-    <div class="media">
-      <figure>
-        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a3-runnymede.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a3-runnymede.mp4" aria-label="Generated film: two clerks copy the charter by lantern light at Runnymede"></video></div>
-        <figcaption>Runnymede, 1215. “Master Gervase. My quill split.” The opening shots of a life film.</figcaption>
-      </figure>
-      <figure>
-        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a3-fork.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a3-fork.mp4" aria-label="Generated film: Apollo 11 mission control, a program alarm, and a go or abort choice over the shot"></video></div>
-        <figcaption>A program alarm in mission control, 1969. The fork plays over the shot, on a timer.</figcaption>
-      </figure>
-      <figure class="narrow">
-        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a3-eeyore-film.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a3-eeyore-film.mp4" aria-label="Generated watercolour film: Pooh finds Eeyore by the stream"></video></div>
-        <figcaption>Eeyore’s Birthday as a film, October 3.</figcaption>
-      </figure>
-    </div>
-  </section>
-
-  <!-- 04 Comics -->
-  <section class="act wrap" id="comics" aria-labelledby="comics-title">
-    <div class="act-head">
-      <p class="act-num"><b>04</b><span class="form">Comics</span>Oct 5 – now</p>
-      <div>
-        <h2 class="serif" id="comics-title">Drawn as you read</h2>
-        <p class="bet">Paint still pictures, letter them in code, and let the reader turn the page.</p>
-      </div>
-    </div>
-    <div class="act-body">
-      <dl class="numbers">
-        <div><dt>12–17s</dt><dd>from a line to its painted panel, down from 65–115s</dd></div>
-        <div><dt>110 / 112</dt><dd>takes with the cast on model</dd></div>
-        <div><dt>$0.19</dt><dd>to write a late page, down from $0.86</dd></div>
-      </dl>
-      <div class="prose">
-        <p>It started on October 5 with <i>The Rent</i>, a <i>Nathan for You</i> parody drawn live. A day later every life on sonder.gg read as a comic, eight pages in four acts. The pictures are painted with no words in them. The lettering is code, which finds the faces so balloons stay off them and tails point at whoever is speaking.</p>
-        <p>Before a panel is shown, two separate looks check it for a missing or extra character, someone off model or off style, stray marks, or the wrong action. A slip buys one retake, and you see the take with the fewest slips. <i>Eeyore’s Birthday</i> is Milne’s chapter six, written past the book; at each decision the deck offers two roads, a line of your own, or the end.</p>
-        <p>Since October 15 a comic can also start from a concept instead of a life. The writer plans the whole story first, then writes the next stretch while the current panels paint.</p>
-      </div>
-    </div>
-    <div class="media">
-      <figure>
-        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a4-read.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a4-read.mp4" aria-label="Eeyore's Birthday: page one paints in, the reader scrolls to the deck, picks the moon's reflection in a jar, and page two follows"></video></div>
-        <figcaption>Eeyore’s Birthday, recorded October 21. Page one, the deck, and a road taken. Roads off the deck are painted ahead, so the next page is already there.</figcaption>
-      </figure>
-      <figure>
-        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a4-write.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a4-write.mp4" aria-label="A reader types their own line into Eeyore's Birthday; the balloons are lettered first, then Pooh and Eeyore are painted beneath them, and the Every road sidebar opens"></video></div>
-        <figcaption>A line of your own: “Pooh gives him a heart-shaped pebble from the stream.” The words are lettered first and the paintings arrive underneath them; the wait for the writer and painter runs at 4× speed. Then the Every road sidebar, with the next fork.</figcaption>
-      </figure>
-      <figure>
-        <div class="frame"><video data-loop muted loop playsinline preload="none" poster="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a4-make.webp" src="https://d3h06xb32ojj4n.cloudfront.net/eliotc/sonder/2026-10-21b/a4-make.mp4" aria-label="A concept comic made from a typed idea about a lighthouse keeper; mid-story the reader adds a direction, and his daughter rows out through the storm"></video></div>
-        <figcaption>A concept comic from one line: “A lighthouse keeper’s last night before the lamp goes electric.” Read a panel at a time; halfway through, a direction typed at the foot of the page (“His daughter rows out through the storm”) is in the story a few panels later. The wait for the first panel runs at 4× speed.</figcaption>
-      </figure>
-    </div>
-  </section>
-
-  <section class="block wrap" aria-labelledby="constants-title">
-    <p class="eyebrow">Across all four</p>
-    <h2 class="serif" id="constants-title">What stayed the same</h2>
-    <div class="constants">
-      <div><h3>A place, a year, an ordinary person</h3><p>History sets the constraints. You choose what they do.</p></div>
-      <div><h3>The deck</h3><p>Choices are written in the character’s voice, with room to write your own.</p></div>
-      <div><h3>The picture follows the story</h3><p>Generation never holds the text up. That’s why roads are painted before you pick one.</p></div>
-      <div><h3>One painter</h3><p>Each new form fixed the last one’s continuity: the stage over loose stills, film over the stage’s seams, a checked panel over a drifting film.</p></div>
-    </div>
-  </section>
-
-  <section class="block wrap" aria-labelledby="built-title">
-    <p class="eyebrow">Process</p>
-    <h2 class="serif" id="built-title">How it was built</h2>
-    <div class="prose" style="margin-top: 28px">
-      <p>sonder is built by a small team directing a lot of coding agents: 3,516 commits and 756 merged pull requests since July 1, and 1,034 commits since comics began on October 5. My job is less drawing screens and more deciding what’s true about the product, catching what’s wrong in live replays, and writing it down precisely enough that the next hundred commits follow it.</p>
-      <p>That’s also why the form could change three times in four months. Undoing things was cheap. The expensive part was knowing what to undo.</p>
-    </div>
-  </section>
+<div class="sonder-context"><p>Pick a place and a year. Play through a generated story as someone who could have lived there.</p><p>One idea, explored in four formats. Each taught us what to build next.</p>
+</div>
+</div>
+<dl class="sonder-meta">
+<div><dt>Role</dt><dd>Co-founder &amp; CPO</dd>
+</div>
+<div><dt>Team</dt><dd>Figment</dd>
+</div>
+<div><dt>Focus</dt><dd>I led product &amp; design</dd>
+</div>
+<div><dt>Explore</dt><dd><a href="https://sonder.gg" rel="noreferrer" target="_blank">Visit sonder.gg ↗</a></dd>
+</div>
+</dl>
+</header>
+<div class="sonder-browse-bar">
+<nav aria-label="Sonder chapters" class="sonder-chapter-nav">
+<div class="sonder-chapter-links"><a aria-current="location" href="#four-formats">Overview</a><a href="#starting-point">Starting point</a><a href="#text">Text</a><a href="#visual-novel">Visual novel</a><a href="#film">Film</a><a href="#comic">Comic</a><a href="#team">Team</a>
+</div><label class="sr-only" for="chapter-select">Jump to chapter</label><select class="sonder-chapter-select" id="chapter-select"><option selected="" value="four-formats">Overview</option><option value="starting-point">Starting point</option><option value="text">Text</option><option value="visual-novel">Visual novel</option><option value="film">Film</option><option value="comic">Comic</option><option value="team">Team</option></select>
+</nav><button class="sonder-motion-toggle" type="button"><span aria-hidden="true">▶</span> Play motion</button>
+</div>
+<section aria-labelledby="formats-title" class="sonder-overview" id="four-formats">
+<div class="sonder-section-intro">
+<div><p class="eyebrow">The evolution, at a glance</p>
+<h2 id="formats-title">One life. Four ways to play.</h2>
+</div><p>The same morning in four formats: Warin, a clerk in 1215, needs a new quill. The choices stay. The way you experience them changes.</p>
+</div>
+<div class="sonder-format-grid">
+<figure>
+<figcaption><a href="#text"><span>01</span><strong>Text</strong><span aria-hidden="true">↓</span></a><p>Start with the choices.</p>
+</figcaption>
+<div class="sonder-loop" data-dialog="recording-0" data-loop="0">
+<video aria-label="Text: Warin at Runnymede" data-inline="" loop="" muted="" playsinline="" poster="assets/loops/w-text.webp" preload="none" src="assets/loops/w-text.mp4">
+</video>
+<div class="sonder-loop-controls"><button aria-label="Play Text: Warin at Runnymede" data-play="" type="button"><span aria-hidden="true">▶</span> Play</button><button aria-controls="recording-0" aria-label="Expand: Text: Warin at Runnymede" data-expand="" type="button">Expand <span aria-hidden="true">↗</span></button>
+</div>
+</div>
+<dialog aria-label="Text: Warin at Runnymede" class="sonder-lightbox sonder-video-dialog" id="recording-0"><button autofocus="" class="sonder-lightbox-close" type="button">Close ×</button>
+<video aria-label="Text: Warin at Runnymede" controls="" loop="" muted="" playsinline="" poster="assets/loops/w-text.webp" preload="none" src="assets/loops/w-text.mp4">
+</video><p>Text: Warin at Runnymede</p>
+</dialog>
+</figure>
+<figure>
+<figcaption><a href="#visual-novel"><span>02</span><strong>Visual novel</strong><span aria-hidden="true">↓</span></a><p>Add faces and voices.</p>
+</figcaption>
+<div class="sonder-loop" data-dialog="recording-1" data-loop="1">
+<video aria-label="Visual novel: Warin at Runnymede" data-inline="" loop="" muted="" playsinline="" poster="assets/loops/w-stage.webp" preload="none" src="assets/loops/w-stage.mp4">
+</video>
+<div class="sonder-loop-controls"><button aria-label="Play Visual novel: Warin at Runnymede" data-play="" type="button"><span aria-hidden="true">▶</span> Play</button><button aria-controls="recording-1" aria-label="Expand: Visual novel: Warin at Runnymede" data-expand="" type="button">Expand <span aria-hidden="true">↗</span></button>
+</div>
+</div>
+<dialog aria-label="Visual novel: Warin at Runnymede" class="sonder-lightbox sonder-video-dialog" id="recording-1"><button autofocus="" class="sonder-lightbox-close" type="button">Close ×</button>
+<video aria-label="Visual novel: Warin at Runnymede" controls="" loop="" muted="" playsinline="" poster="assets/loops/w-stage.webp" preload="none" src="assets/loops/w-stage.mp4">
+</video><p>Visual novel: Warin at Runnymede</p>
+</dialog>
+</figure>
+<figure>
+<figcaption><a href="#film"><span>03</span><strong>Film</strong><span aria-hidden="true">↓</span></a><p>Make the whole scene move.</p>
+</figcaption>
+<div class="sonder-loop" data-dialog="recording-2" data-loop="2">
+<video aria-label="Film: Warin at Runnymede" data-inline="" loop="" muted="" playsinline="" poster="assets/loops/a3-runnymede.webp" preload="none" src="assets/loops/a3-runnymede.mp4">
+</video>
+<div class="sonder-loop-controls"><button aria-label="Play Film: Warin at Runnymede" data-play="" type="button"><span aria-hidden="true">▶</span> Play</button><button aria-controls="recording-2" aria-label="Expand: Film: Warin at Runnymede" data-expand="" type="button">Expand <span aria-hidden="true">↗</span></button>
+</div>
+</div>
+<dialog aria-label="Film: Warin at Runnymede" class="sonder-lightbox sonder-video-dialog" id="recording-2"><button autofocus="" class="sonder-lightbox-close" type="button">Close ×</button>
+<video aria-label="Film: Warin at Runnymede" controls="" loop="" muted="" playsinline="" poster="assets/loops/a3-runnymede.webp" preload="none" src="assets/loops/a3-runnymede.mp4">
+</video><p>Film: Warin at Runnymede</p>
+</dialog>
+</figure>
+<figure>
+<figcaption><a href="#comic"><span>04</span><strong>Comic</strong><span aria-hidden="true">↓</span></a><p>Read at your own pace.</p>
+</figcaption>
+<div class="sonder-loop" data-dialog="recording-3" data-loop="3">
+<video aria-label="Comic: Warin at Runnymede" data-inline="" loop="" muted="" playsinline="" poster="assets/loops/a4-warin.webp" preload="none" src="assets/loops/a4-warin.mp4">
+</video>
+<div class="sonder-loop-controls"><button aria-label="Play Comic: Warin at Runnymede" data-play="" type="button"><span aria-hidden="true">▶</span> Play</button><button aria-controls="recording-3" aria-label="Expand: Comic: Warin at Runnymede" data-expand="" type="button">Expand <span aria-hidden="true">↗</span></button>
+</div>
+</div>
+<dialog aria-label="Comic: Warin at Runnymede" class="sonder-lightbox sonder-video-dialog" id="recording-3"><button autofocus="" class="sonder-lightbox-close" type="button">Close ×</button>
+<video aria-label="Comic: Warin at Runnymede" controls="" loop="" muted="" playsinline="" poster="assets/loops/a4-warin.webp" preload="none" src="assets/loops/a4-warin.mp4">
+</video><p>Comic: Warin at Runnymede</p>
+</dialog>
+</figure>
+</div><p class="sonder-media-note">Recordings from the prototypes. Text, visual novel, and comic: October 2026. Film: September 2026.</p>
+</section>
+<div class="sonder-main">
+<aside>
+<div class="sonder-side-nav">
+<nav aria-label="On this page" class="sonder-toc"><p class="eyebrow">Contents</p><ol><li><a aria-current="location" href="#four-formats">One story, four formats</a></li><li><a href="#starting-point">The starting point</a></li><li><a href="#text">01  Text</a></li><li><a href="#visual-novel">02  Visual novel</a></li><li><a href="#film">03  Film</a></li><li><a href="#comic">04  Comic</a></li><li><a href="#team">Our team &amp; my role</a></li></ol>
+</nav><button class="sonder-motion-toggle" type="button"><span aria-hidden="true">▶</span> Play motion</button>
+</div>
+</aside>
+<div class="sonder-chapters">
+<section id="starting-point">
+<div class="sonder-origin">
+<div class="sonder-chapter-heading"><p class="eyebrow">The starting point / A place and a year</p>
+<h2>From reading history to living it.</h2>
+<div class="sonder-copy"><p>The globe started as a history reader: pick a country and a year to read about that moment.</p><p>I wanted to make it personal. Choose a person who could have lived there, then decide what they do.</p>
+</div>
+</div>
+<figure class="sonder-globe-figure">
+<div aria-label="Explore the globe" class="sonder-globe" role="group">
+<div class="sonder-globe-surface" style="position:relative;display:grid;place-items:center"><canvas aria-label="Rotating Earth with visible continents. Drag or use left and right arrow keys to rotate. Press Space to pause or play." height="480" role="img" style="display:block;width:100%;max-width:520px;height:auto;aspect-ratio:1;cursor:grab;touch-action:pan-y;border-radius:50%;background:radial-gradient(circle, transparent 57%, rgba(145, 171, 184, .12) 62%, transparent 71%)" tabindex="0" width="480">Earth, with the Americas, Europe, and Africa visible.</canvas><p role="status" style="position:absolute;padding:1rem;text-align:center">Loading the globe…</p>
+</div>
+<div class="sonder-globe-controls" style="display:flex;justify-content:center;gap:8px;padding:0 16px 20px"><button aria-label="Rotate globe left" disabled="" style="min-width:44px;min-height:44px" type="button">←</button><button aria-label="Play globe rotation" disabled="" style="min-width:112px;min-height:44px" type="button">Rotate globe</button><button aria-label="Rotate globe right" disabled="" style="min-width:44px;min-height:44px" type="button">→</button>
+</div>
+</div>
+<figcaption>Original map, recreated interaction. Drag to rotate.</figcaption>
+</figure>
+</div>
+<div class="sonder-pair">
+<figure class="sonder-demo">
+<figcaption><strong>The original history reader</strong>A country and year opened an article about that moment.</figcaption><button aria-controls="image-0" aria-label="Enlarge: The original history reader" class="sonder-image" data-dialog="image-0" type="button"><img alt="The original history reader" height="720" loading="lazy" src="assets/01-globe-editorial.webp" width="1280"/><span aria-hidden="true">View image ↗</span></button>
+<dialog aria-label="The original history reader" class="sonder-lightbox" id="image-0"><button autofocus="" class="sonder-lightbox-close" type="button">Close ×</button><img alt="The original history reader" height="720" loading="lazy" src="assets/01-globe-editorial.webp" width="1280"/><p>The original history reader</p>
+</dialog>
+</figure>
+<figure class="sonder-demo">
+<figcaption><strong>Choose who to be</strong>Pick a person, create your own, or start with a random life.</figcaption><button aria-controls="image-1" aria-label="Enlarge: Choose who to be" class="sonder-image" data-dialog="image-1" type="button"><img alt="Choose who to be" height="720" loading="lazy" src="assets/04-create-character.webp" width="1280"/><span aria-hidden="true">View image ↗</span></button>
+<dialog aria-label="Choose who to be" class="sonder-lightbox" id="image-1"><button autofocus="" class="sonder-lightbox-close" type="button">Close ×</button><img alt="Choose who to be" height="720" loading="lazy" src="assets/04-create-character.webp" width="1280"/><p>Choose who to be</p>
+</dialog>
+</figure>
+</div>
+</section>
+<section id="text">
+<div class="sonder-chapter-heading"><p class="eyebrow">01 / Text · July</p>
+<h2>Text made the choices work.</h2>
+<div class="sonder-copy"><p>Read a scene. Decide what happens next.</p>
+</div>
+</div>
+<dl class="sonder-decision">
+<div><dt>What we built</dt><dd>Scenes with two suggested actions, space to write your own, and memory of your choices.</dd>
+</div>
+<div><dt>What we learned</dt><dd>Early scenes lost track of people. We began planning the cast and key events before each scene.</dd>
+</div>
+</dl>
+<div class="sonder-pair">
+<figure class="sonder-demo">
+<figcaption><span class="sonder-demo-context">Runnymede · 14 sec</span><strong>Choose a reply—or write your own</strong><span>Watch the player add a response beyond the two suggestions.</span>
+</figcaption>
+<div class="sonder-loop" data-dialog="recording-4" data-loop="4">
+<video aria-label="Choose a reply—or write your own" data-inline="" loop="" muted="" playsinline="" poster="assets/loops/w-text.webp" preload="none" src="assets/loops/w-text.mp4">
+</video>
+<div class="sonder-loop-controls"><button aria-label="Play Choose a reply—or write your own" data-play="" type="button"><span aria-hidden="true">▶</span> Play</button><button aria-controls="recording-4" aria-label="Expand: Choose a reply—or write your own" data-expand="" type="button">Expand <span aria-hidden="true">↗</span></button>
+</div>
+</div>
+<dialog aria-label="Choose a reply—or write your own" class="sonder-lightbox sonder-video-dialog" id="recording-4"><button autofocus="" class="sonder-lightbox-close" type="button">Close ×</button>
+<video aria-label="Choose a reply—or write your own" controls="" loop="" muted="" playsinline="" poster="assets/loops/w-text.webp" preload="none" src="assets/loops/w-text.mp4">
+</video><p>Choose a reply—or write your own</p>
+</dialog>
+</figure>
+<figure class="sonder-demo">
+<figcaption><strong>Set the scene with one image</strong>A painted still establishes the place and the people.</figcaption><button aria-controls="image-2" aria-label="Enlarge: Set the scene with one image" class="sonder-image" data-dialog="image-2" type="button"><img alt="Set the scene with one image" height="888" loading="lazy" src="assets/loops/a1-scene.webp" width="1184"/><span aria-hidden="true">View image ↗</span></button>
+<dialog aria-label="Set the scene with one image" class="sonder-lightbox" id="image-2"><button autofocus="" class="sonder-lightbox-close" type="button">Close ×</button><img alt="Set the scene with one image" height="888" loading="lazy" src="assets/loops/a1-scene.webp" width="1184"/><p>Set the scene with one image</p>
+</dialog>
+</figure>
+</div>
+</section>
+<section id="visual-novel">
+<div class="sonder-chapter-heading"><p class="eyebrow">02 / Visual novel · July–September</p>
+<h2>The visual novel added faces and voices.</h2>
+<div class="sonder-copy"><p>I brought the cast, dialogue, and choices onto one stage.</p>
+</div>
+</div>
+<dl class="sonder-decision">
+<div><dt>What we built</dt><dd>Painted backgrounds, character expressions, and voiced dialogue on web and iPhone.</dd>
+</div>
+<div><dt>What we learned</dt><dd>Characters couldn’t reliably pick up objects. Film let us generate the people and action together.</dd>
+</div>
+</dl>
+<figure class="sonder-demo">
+<figcaption><strong>From a reading view to a stage</strong>The text moves to the side so the scene has room.</figcaption><button aria-controls="image-3" aria-label="Enlarge: From a reading view to a stage" class="sonder-image" data-dialog="image-3" type="button"><img alt="From a reading view to a stage" height="912" loading="lazy" src="assets/loops/a2-bridge.webp" width="1600"/><span aria-hidden="true">View image ↗</span></button>
+<dialog aria-label="From a reading view to a stage" class="sonder-lightbox" id="image-3"><button autofocus="" class="sonder-lightbox-close" type="button">Close ×</button><img alt="From a reading view to a stage" height="912" loading="lazy" src="assets/loops/a2-bridge.webp" width="1600"/><p>From a reading view to a stage</p>
+</dialog>
+</figure>
+<figure class="sonder-demo">
+<figcaption><span class="sonder-demo-context">Visual novel · 18 sec</span><strong>Take a turn in the conversation</strong><span>Follow the dialogue, then watch the player type a response.</span>
+</figcaption>
+<div class="sonder-loop" data-dialog="recording-5" data-loop="5">
+<video aria-label="Take a turn in the conversation" data-inline="" loop="" muted="" playsinline="" poster="assets/loops/a2-stage.webp" preload="none" src="assets/loops/a2-stage.mp4">
+</video>
+<div class="sonder-loop-controls"><button aria-label="Play Take a turn in the conversation" data-play="" type="button"><span aria-hidden="true">▶</span> Play</button><button aria-controls="recording-5" aria-label="Expand: Take a turn in the conversation" data-expand="" type="button">Expand <span aria-hidden="true">↗</span></button>
+</div>
+</div>
+<dialog aria-label="Take a turn in the conversation" class="sonder-lightbox sonder-video-dialog" id="recording-5"><button autofocus="" class="sonder-lightbox-close" type="button">Close ×</button>
+<video aria-label="Take a turn in the conversation" controls="" loop="" muted="" playsinline="" poster="assets/loops/a2-stage.webp" preload="none" src="assets/loops/a2-stage.mp4">
+</video><p>Take a turn in the conversation</p>
+</dialog>
+</figure>
+<div class="sonder-phones">
+<figure class="sonder-phone sonder-demo">
+<figcaption><strong>The scene on iPhone</strong>The same cast and dialogue in a smaller space.</figcaption><button aria-controls="image-4" aria-label="Enlarge: The scene on iPhone" class="sonder-image" data-dialog="image-4" type="button"><img alt="The scene on iPhone" height="1738" loading="lazy" src="assets/loops/a2-ios-scene.webp" width="800"/><span aria-hidden="true">View image ↗</span></button>
+<dialog aria-label="The scene on iPhone" class="sonder-lightbox" id="image-4"><button autofocus="" class="sonder-lightbox-close" type="button">Close ×</button><img alt="The scene on iPhone" height="1738" loading="lazy" src="assets/loops/a2-ios-scene.webp" width="800"/><p>The scene on iPhone</p>
+</dialog>
+</figure>
+<figure class="sonder-phone sonder-demo">
+<figcaption><strong>The choices on iPhone</strong>A clear place to decide what to do next.</figcaption><button aria-controls="image-5" aria-label="Enlarge: The choices on iPhone" class="sonder-image" data-dialog="image-5" type="button"><img alt="The choices on iPhone" height="1738" loading="lazy" src="assets/loops/a2-ios-deck.webp" width="800"/><span aria-hidden="true">View image ↗</span></button>
+<dialog aria-label="The choices on iPhone" class="sonder-lightbox" id="image-5"><button autofocus="" class="sonder-lightbox-close" type="button">Close ×</button><img alt="The choices on iPhone" height="1738" loading="lazy" src="assets/loops/a2-ios-deck.webp" width="800"/><p>The choices on iPhone</p>
+</dialog>
+</figure>
+</div>
+</section>
+<section id="film">
+<div class="sonder-chapter-heading"><p class="eyebrow">03 / Film · September–October</p>
+<h2>Film made the whole scene move.</h2>
+<div class="sonder-copy"><p>Each shot starts from the last frame of the one before it.</p>
+</div>
+</div>
+<dl class="sonder-decision">
+<div><dt>What we built</dt><dd>A generated film that pauses for choices. The next shots are prepared ahead of time.</dd>
+</div>
+<div><dt>What we learned</dt><dd>Video cost more, characters could change appearance, and the film set the pace. We tried comics to give readers control.</dd>
+</div>
+</dl>
+<div class="sonder-pair">
+<figure class="sonder-demo">
+<figcaption><span class="sonder-demo-context">Runnymede · 12 sec</span><strong>Generate people and action together</strong><span>Watch Warin ask for a new quill within one continuous scene.</span>
+</figcaption>
+<div class="sonder-loop" data-dialog="recording-6" data-loop="6">
+<video aria-label="Generate people and action together" data-inline="" loop="" muted="" playsinline="" poster="assets/loops/a3-runnymede.webp" preload="none" src="assets/loops/a3-runnymede.mp4">
+</video>
+<div class="sonder-loop-controls"><button aria-label="Play Generate people and action together" data-play="" type="button"><span aria-hidden="true">▶</span> Play</button><button aria-controls="recording-6" aria-label="Expand: Generate people and action together" data-expand="" type="button">Expand <span aria-hidden="true">↗</span></button>
+</div>
+</div>
+<dialog aria-label="Generate people and action together" class="sonder-lightbox sonder-video-dialog" id="recording-6"><button autofocus="" class="sonder-lightbox-close" type="button">Close ×</button>
+<video aria-label="Generate people and action together" controls="" loop="" muted="" playsinline="" poster="assets/loops/a3-runnymede.webp" preload="none" src="assets/loops/a3-runnymede.mp4">
+</video><p>Generate people and action together</p>
+</dialog>
+</figure>
+<figure class="sonder-demo">
+<figcaption><span class="sonder-demo-context">Mission control, 1969 · 14 sec</span><strong>Put a choice inside the film</strong><span>Another story: a program alarm leads to a go-or-abort decision.</span>
+</figcaption>
+<div class="sonder-loop" data-dialog="recording-7" data-loop="7">
+<video aria-label="Put a choice inside the film" data-inline="" loop="" muted="" playsinline="" poster="assets/loops/a3-fork.webp" preload="none" src="assets/loops/a3-fork.mp4">
+</video>
+<div class="sonder-loop-controls"><button aria-label="Play Put a choice inside the film" data-play="" type="button"><span aria-hidden="true">▶</span> Play</button><button aria-controls="recording-7" aria-label="Expand: Put a choice inside the film" data-expand="" type="button">Expand <span aria-hidden="true">↗</span></button>
+</div>
+</div>
+<dialog aria-label="Put a choice inside the film" class="sonder-lightbox sonder-video-dialog" id="recording-7"><button autofocus="" class="sonder-lightbox-close" type="button">Close ×</button>
+<video aria-label="Put a choice inside the film" controls="" loop="" muted="" playsinline="" poster="assets/loops/a3-fork.webp" preload="none" src="assets/loops/a3-fork.mp4">
+</video><p>Put a choice inside the film</p>
+</dialog>
+</figure>
+</div>
+</section>
+<section id="comic">
+<div class="sonder-chapter-heading"><p class="eyebrow">04 / Comic · October</p>
+<h2>Comics let readers set the pace.</h2>
+<div class="sonder-copy"><p>Keep the pictures and choices. Let people read at their own pace.</p>
+</div>
+</div>
+<dl class="sonder-decision">
+<div><dt>What we built</dt><dd>A story told panel by panel. Choose a response, write your own, or start a story from an idea.</dd>
+</div>
+<div><dt>How it works</dt><dd>We add lettering separately, check the art, and prepare the next branches before the reader chooses.</dd>
+</div>
+</dl>
+<figure class="sonder-demo">
+<figcaption><span class="sonder-demo-context">Eeyore’s Birthday · 14 sec</span><strong>Choose a gift. See the next page.</strong><span>Another story: a choice in Eeyore’s Birthday becomes the next part of the comic.</span>
+</figcaption>
+<div class="sonder-loop" data-dialog="recording-8" data-loop="8">
+<video aria-label="Choose a gift. See the next page." data-inline="" loop="" muted="" playsinline="" poster="assets/loops/a4-read.webp" preload="none" src="assets/loops/a4-read.mp4">
+</video>
+<div class="sonder-loop-controls"><button aria-label="Play Choose a gift. See the next page." data-play="" type="button"><span aria-hidden="true">▶</span> Play</button><button aria-controls="recording-8" aria-label="Expand: Choose a gift. See the next page." data-expand="" type="button">Expand <span aria-hidden="true">↗</span></button>
+</div>
+</div>
+<dialog aria-label="Choose a gift. See the next page." class="sonder-lightbox sonder-video-dialog" id="recording-8"><button autofocus="" class="sonder-lightbox-close" type="button">Close ×</button>
+<video aria-label="Choose a gift. See the next page." controls="" loop="" muted="" playsinline="" poster="assets/loops/a4-read.webp" preload="none" src="assets/loops/a4-read.mp4">
+</video><p>Choose a gift. See the next page.</p>
+</dialog>
+</figure>
+<div class="sonder-pair">
+<figure class="sonder-demo">
+<figcaption><span class="sonder-demo-context">Eeyore’s Birthday · 19 sec</span><strong>Write a choice the story didn’t offer</strong><span>The reader suggests a different gift. Words arrive first, then the art.</span>
+</figcaption>
+<div class="sonder-loop" data-dialog="recording-9" data-loop="9">
+<video aria-label="Write a choice the story didn’t offer" data-inline="" loop="" muted="" playsinline="" poster="assets/loops/a4-write.webp" preload="none" src="assets/loops/a4-write.mp4">
+</video>
+<div class="sonder-loop-controls"><button aria-label="Play Write a choice the story didn’t offer" data-play="" type="button"><span aria-hidden="true">▶</span> Play</button><button aria-controls="recording-9" aria-label="Expand: Write a choice the story didn’t offer" data-expand="" type="button">Expand <span aria-hidden="true">↗</span></button>
+</div>
+</div>
+<dialog aria-label="Write a choice the story didn’t offer" class="sonder-lightbox sonder-video-dialog" id="recording-9"><button autofocus="" class="sonder-lightbox-close" type="button">Close ×</button>
+<video aria-label="Write a choice the story didn’t offer" controls="" loop="" muted="" playsinline="" poster="assets/loops/a4-write.webp" preload="none" src="assets/loops/a4-write.mp4">
+</video><p>Write a choice the story didn’t offer</p>
+</dialog>
+</figure>
+<figure class="sonder-demo">
+<figcaption><span class="sonder-demo-context">The lighthouse keeper · 25 sec</span><strong>Start a story. Change it as you read.</strong><span>A lighthouse story starts from one sentence. A new direction changes the next panels.</span>
+</figcaption>
+<div class="sonder-loop" data-dialog="recording-10" data-loop="10">
+<video aria-label="Start a story. Change it as you read." data-inline="" loop="" muted="" playsinline="" poster="assets/loops/a4-make.webp" preload="none" src="assets/loops/a4-make.mp4">
+</video>
+<div class="sonder-loop-controls"><button aria-label="Play Start a story. Change it as you read." data-play="" type="button"><span aria-hidden="true">▶</span> Play</button><button aria-controls="recording-10" aria-label="Expand: Start a story. Change it as you read." data-expand="" type="button">Expand <span aria-hidden="true">↗</span></button>
+</div>
+</div>
+<dialog aria-label="Start a story. Change it as you read." class="sonder-lightbox sonder-video-dialog" id="recording-10"><button autofocus="" class="sonder-lightbox-close" type="button">Close ×</button>
+<video aria-label="Start a story. Change it as you read." controls="" loop="" muted="" playsinline="" poster="assets/loops/a4-make.webp" preload="none" src="assets/loops/a4-make.mp4">
+</video><p>Start a story. Change it as you read.</p>
+</dialog>
+</figure>
+</div><p class="sonder-media-note">Shortened recordings. Generation waits are sped up where marked in the demos.</p>
+</section>
+<section id="team">
+<div class="sonder-chapter-heading"><p class="eyebrow">Our team / Product, design &amp; engineering</p>
+<h2>From model output to playable stories.</h2>
+<div class="sonder-copy"><p>Exploring four formats helped us work out what to keep, what to change, and what to build next.</p>
+</div>
+</div>
+<dl class="sonder-team-roles">
+<div><dt>Our team</dt><dd>Built the story engine, memory, voices, visuals, and choices as one product.</dd>
+</div>
+<div><dt>My role</dt><dd>Led product and design. Played the builds, identified problems, and wrote briefs for the team and our coding agents.</dd>
+</div>
+<div><dt>My background</dt><dd>Previously worked on Fortnite’s social experience and cross-platform text chat at Epic Games.</dd>
+</div>
+</dl>
+<div class="sonder-closing">
+<h3>More stories to build.</h3><p>We want to keep building as a team. For Runway Labs, we’d bring experience taking generative media from a model output to something people can play.</p><a href="mailto:me@eliotc.com">Get in touch ↗</a>
+</div>
+</section>
+</div>
+</div>
+<div class="sonder-next"><a href="/">← Back to eliotc.com</a>
+</div>
+</article>
 </main>
-
-<footer>
-  <div class="wrap">
-    <span>eliot chang · <a href="mailto:me@eliotc.com">me@eliotc.com</a></span>
-    <nav><a href="https://sonder.gg">sonder.gg</a><a href="/">eliotc.com</a></nav>
+<footer class="site-footer">
+  <div class="site-footer-inner">
+    <p class="eyebrow">Say hello</p>
+    <a class="footer-email" href="mailto:me@eliotc.com">me@eliotc.com</a>
+    <div class="footer-bottom"><nav aria-label="Find Eliot"><a href="https://www.linkedin.com/in/eliot-chang/">LinkedIn ↗</a><a href="https://eliotchang.medium.com/">Medium ↗</a><a href="https://docs.google.com/document/d/1Gn257Oo2Tdrnf8u51dKeGFQw_ZbxBJLO6IESc3gNT_4/edit">Résumé ↗</a></nav><p>© 2026 Eliot Chang · San Francisco</p></div>
   </div>
 </footer>
-
-<script>
-(() => {
-  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches
-  const loops = document.querySelectorAll("video[data-loop]")
-  if (reduced) {
-    loops.forEach((v) => { v.controls = true })
-  } else {
-    const io = new IntersectionObserver((entries) => {
-      for (const e of entries) {
-        if (e.isIntersecting) e.target.play().catch(() => {})
-        else e.target.pause()
-      }
-    }, { threshold: 0.2 })
-    loops.forEach((v) => io.observe(v))
-  }
-
-  const links = [...document.querySelectorAll(".bar nav a")]
-  const acts = links.map((a) => document.querySelector(a.getAttribute("href")))
-  const spy = new IntersectionObserver((entries) => {
-    for (const e of entries) {
-      if (!e.isIntersecting) continue
-      links.forEach((a) => a.setAttribute("aria-current", String(a.getAttribute("href") === `#${e.target.id}`)))
-    }
-  }, { rootMargin: "-45% 0px -50% 0px" })
-  acts.forEach((s) => s && spy.observe(s))
-})()
-</script>
 </body>
 </html>
