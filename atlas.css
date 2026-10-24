@@ -107,11 +107,6 @@ button { font: inherit; letter-spacing: inherit; }
 .note a:hover { text-decoration-color: rgba(17, 17, 16, 0.9); }
 .note:hover { background: #fbfbfa; }
 .n-open:focus-visible, .note a:focus-visible { outline: 1px solid var(--ink); outline-offset: 2px; border-radius: 2px; }
-.fold {
-  position: fixed; z-index: 7; left: 0; top: 0; width: 0; height: 0; pointer-events: none;
-  background: var(--paper); border-radius: 16px; display: none;
-  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.25), 0 24px 64px -24px rgba(0, 0, 0, 0.7);
-}
 /* Narrow screens: the caption owns the bottom, so the note moves top-left and
    collapses to one line; a tap expands it, a second tap opens the card. */
 @media (max-width: 899px) {
@@ -143,11 +138,11 @@ button { font: inherit; letter-spacing: inherit; }
 /* Caption panel */
 .panel {
   position: fixed; z-index: 4; left: var(--gutter); bottom: var(--gutter);
-  width: min(560px, calc(100vw - 2 * var(--gutter)));
-  pointer-events: none; opacity: 0; transform: translateY(6px);
+  width: min(460px, calc(100vw - 2 * var(--gutter)));
+  pointer-events: none; opacity: 0; visibility: hidden; transform: translateY(6px);
   transition: opacity 0.5s var(--ease), transform 0.6s var(--ease);
 }
-.is-playing .panel { opacity: 1; transform: none; }
+.is-playing .panel { opacity: 1; visibility: visible; transform: none; }
 /* A soft local shade behind the caption block: feathered to nothing, so there is no box,
    but dark enough behind the text for AA contrast over a bright frame. */
 .panel { isolation: isolate; }
@@ -157,42 +152,48 @@ button { font: inherit; letter-spacing: inherit; }
   background: radial-gradient(closest-side, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.5) 45%, rgba(0, 0, 0, 0.22) 75%, transparent);
 }
 .panel a { pointer-events: auto; }
-.p-name, .p-asof, .p-sources, .p-music, .nav { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6), 0 0 12px rgba(0, 0, 0, 0.45); }
-.p-name { margin: 0; font-size: 20px; line-height: 1.2; font-weight: 500; letter-spacing: -0.015em; }
-.p-asof { margin: 4px 0 0; font-size: 13px; color: var(--on-dark-muted); }
+.p-name, .p-line, .p-nav { text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5); }
+.p-name { margin: 0; font-size: 19px; line-height: 1.25; font-weight: 500; letter-spacing: -0.015em; }
 .p-line {
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7), 0 0 10px rgba(0, 0, 0, 0.55), 0 0 24px rgba(0, 0, 0, 0.45);
-  margin: 16px 0 0; font-size: 16px; line-height: 1.45; min-height: 2.9em; max-width: 44ch;
-  text-wrap: pretty; transition: opacity 0.25s;
+  margin: 9px 0 0; font-size: 15px; line-height: 1.5; min-height: 3em; max-width: 42ch;
+  color: rgba(239, 238, 233, 0.82); text-wrap: pretty; transition: opacity 0.25s;
 }
 .p-line.is-swap { opacity: 0; transition-duration: 0.16s; }
-.p-sources { margin: 8px 0 0; font-size: 12px; color: var(--on-dark-muted); display: flex; flex-wrap: wrap; gap: 4px 16px; }
-.p-sources:empty { display: none; }
-.p-sources a {
-  color: var(--on-dark-muted); text-decoration: underline; text-decoration-thickness: 1px;
-  text-underline-offset: 3px; text-decoration-color: rgba(239, 238, 233, 0.25);
-}
-.p-sources a:hover { color: var(--on-dark); }
-.p-music { margin: 4px 0 0; font-size: 11px; color: rgba(239, 238, 233, 0.5); }
-.p-music:empty { display: none; }
-
-.p-nav { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-top: 16px; pointer-events: auto; }
-.p-nav:empty { display: none; }
+.p-nav { display: flex; align-items: center; gap: 6px; margin-top: 12px; pointer-events: auto; }
 .nav {
-  padding: 4px 0; border: 0; background: none; cursor: pointer;
-  font-size: 13px; line-height: 1.3; color: var(--on-dark-muted); transition: color 0.2s;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 36px; padding: 0 8px; border: 0; border-radius: 8px; background: none;
+  cursor: pointer; font-size: 13px; line-height: 1.4; color: var(--on-dark-muted);
+  transition: color 0.2s, background 0.2s;
 }
-.nav:hover { color: var(--on-dark); }
-.nav:focus-visible { outline: 1px solid var(--on-dark); outline-offset: 3px; border-radius: 2px; }
+#prev, #next { width: 36px; font-size: 19px; border: 1px solid rgba(239, 238, 233, 0.2); }
+#prev .nav-name, #next .nav-name { display: none; }
+.nav:hover, .p-details summary:hover { color: var(--on-dark); background: rgba(255, 255, 255, 0.07); }
+.nav:focus-visible, .p-details summary:focus-visible { outline: 2px solid var(--on-dark); outline-offset: 3px; border-radius: 6px; }
 .nav[hidden] { display: none; }
-.thread {
-  padding: 3px 8px; border: 1px solid rgba(239, 238, 233, 0.18); border-radius: 6px; font-size: 12px;
+.p-details { margin-left: 6px; }
+.p-details summary {
+  display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 8px;
+  list-style: none; border-radius: 6px; font-size: 12px; color: var(--on-dark-muted); cursor: pointer;
 }
-.thread:hover { border-color: rgba(239, 238, 233, 0.4); }
-
-/* The call: offered only while its shot plays. */
-.call { opacity: 0; pointer-events: none; transition: opacity 0.9s var(--ease); }
-.call.is-on { opacity: 1; pointer-events: auto; }
+.p-details summary::-webkit-details-marker { display: none; }
+.p-details summary::after { content: "+"; font-size: 15px; }
+.p-details[open] summary::after { content: "−"; }
+.p-context {
+  position: absolute; z-index: 2; left: 0; bottom: calc(100% + 12px); width: min(360px, 100%);
+  max-height: min(360px, 55vh); overflow-y: auto; padding: 18px;
+  background: #141413; border: 1px solid rgba(239, 238, 233, 0.16); border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25); text-shadow: none;
+}
+.p-asof { margin: 0; font-size: 12px; line-height: 1.6; color: var(--on-dark-muted); }
+.p-sources { margin: 12px 0 0; display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 13px; }
+.p-sources a { color: var(--on-dark); text-underline-offset: 4px; text-decoration-color: rgba(239, 238, 233, 0.3); }
+.p-music { margin: 12px 0 0; font-size: 12px; color: var(--on-dark-muted); }
+.p-sources:empty, .p-music:empty, .p-asof:empty { display: none; }
+.thread { width: 100%; justify-content: flex-start; text-align: left; padding: 12px 0 0; margin-top: 14px; border-top: 1px solid rgba(239, 238, 233, 0.14); border-radius: 0; }
+/* A narrative invitation appears only while its shot is active. */
+.call { display: none; }
+.call.is-on { display: inline-flex; }
 .is-finale .panel { display: none; }
 /* The ending: one feather at the end of the route. */
 .glint {
@@ -228,10 +229,8 @@ button { font: inherit; letter-spacing: inherit; }
   .p-name { font-size: 18px; }
   .p-line { font-size: 15px; }
 }
-/* Small phones (iPhone SE/mini, 320-379px): the compact note can't fit beside the film
-   controls, so it keeps just "eliot" (a tap still opens it), and the Previously list tightens. */
+/* Keep the bio comfortable on small phones. */
 @media (max-width: 379px) {
-  .note.is-compact .n-now { display: none; }
   .card { padding: 20px; }
   .card .credits { grid-template-columns: max-content minmax(0, 1fr); column-gap: 20px; }
 }

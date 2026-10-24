@@ -49,7 +49,6 @@
   <p class="n-now">currently <a href="https://sonder.gg">sonder.gg</a></p>
   <p class="n-links"><a href="https://docs.google.com/document/d/1Gn257Oo2Tdrnf8u51dKeGFQw_ZbxBJLO6IESc3gNT_4/edit">Resume</a><span aria-hidden="true"> · </span><a href="https://www.linkedin.com/in/eliot-chang/">LinkedIn</a><span aria-hidden="true"> · </span><a href="mailto:me@eliotc.com">Email</a></p>
 </aside>
-<div class="fold" id="fold" aria-hidden="true"></div>
 
 <div class="controls" id="controls">
   <button class="ctl" id="mute" type="button" aria-pressed="false">Sound on</button>
@@ -58,15 +57,20 @@
 
 <div class="panel" id="panel" aria-live="polite">
   <h2 class="p-name" id="p-name"></h2>
-  <p class="p-asof" id="p-asof"></p>
   <p class="p-line" id="p-line"></p>
-  <p class="p-sources" id="p-sources"></p>
-  <p class="p-music" id="p-music"></p>
   <div class="p-nav" id="p-nav">
     <button class="nav" id="prev" type="button" aria-keyshortcuts="ArrowLeft"><span aria-hidden="true">←</span> <span class="nav-name"></span></button>
     <button class="nav" id="next" type="button" aria-keyshortcuts="ArrowRight"><span class="nav-name"></span> <span aria-hidden="true">→</span></button>
+    <details class="p-details" id="p-details">
+      <summary>Scene details</summary>
+      <div class="p-context">
+        <p class="p-asof" id="p-asof"></p>
+        <p class="p-sources" id="p-sources"></p>
+        <p class="p-music" id="p-music"></p>
+        <button class="nav thread" id="thread" type="button" hidden></button>
+      </div>
+    </details>
     <button class="nav call" id="call" type="button" hidden><span aria-hidden="true">→</span> <span class="nav-name"></span></button>
-    <button class="nav thread" id="thread" type="button" hidden></button>
   </div>
 </div>
 

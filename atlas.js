@@ -24,18 +24,17 @@
     pin: "#efeee9",
   };
   const FINALE_ID = "__finale";
-  const WIPE_MS = 520;
+  const WIPE_MS = 340;
   const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   const params = new URLSearchParams(location.search);
   const mqReduced = matchMedia("(prefers-reduced-motion: reduce)");
   const mqCoarse = matchMedia("(pointer: coarse)");
-  const mqNarrow = matchMedia("(max-width: 899px)");
   const $ = (s) => document.querySelector(s);
 
   const els = {
-    stage: $("#stage"), card: $("#card"), note: $("#note"), noteOpen: $("#note-open"), fold: $("#fold"),
-    panel: $("#panel"), name: $("#p-name"), asof: $("#p-asof"), line: $("#p-line"), sources: $("#p-sources"),
+    stage: $("#stage"), card: $("#card"), note: $("#note"), noteOpen: $("#note-open"),
+    panel: $("#panel"), details: $("#p-details"), name: $("#p-name"), asof: $("#p-asof"), line: $("#p-line"), sources: $("#p-sources"),
     music: $("#p-music"), prev: $("#prev"), call: $("#call"), glint: $("#glint"), next: $("#next"), thread: $("#thread"),
     mute: $("#mute"), close: $("#close"), hint: $("#hint"), tip: $("#tip"),
   };
@@ -579,12 +578,12 @@ void main() {
     watchFirstFrame(slot, gen);
     if (autoplay) playEl(el);
     const img = posterFor(place);
-    const usePoster = () => {
+    const applyPoster = () => {
       if (slot.gen !== gen || slot.videoReady || !img.naturalWidth) return;
       if (gl) { try { upload(slot.tex, img); } catch (_) { return; } }
       slot.asp = img.naturalWidth / img.naturalHeight; slot.posterReady = true;
     };
-    if (img.complete) usePoster(); else img.addEventListener("load", usePoster, { once: true });
+    if (img.complete) applyPoster(); else img.addEventListener("load", applyPoster, { once: true });
   }
   // Play with the remembered sound choice; if the browser refuses sound without a
   // gesture, play muted this time (the remembered choice is left alone).
@@ -601,14 +600,38 @@ void main() {
     els.mute.textContent = S.muted ? "Sound on" : "Sound off";
     els.mute.setAttribute("aria-pressed", String(!S.muted));
   }
+  // Track presented frames, not currentTime (which advances between decoded frames).
+  // This avoids uploading the same large video texture at display refresh rate.
+  const frameTracks = new WeakMap();
+  function trackVideo(el) {
+    stopTracking(el);
+    const track = { version: 0, callback: 0 };
+    frameTracks.set(el, track);
+    if (!el.requestVideoFrameCallback) return;
+    const onFrame = () => {
+      if (frameTracks.get(el) !== track) return;
+      track.version++;
+      track.callback = el.requestVideoFrameCallback(onFrame);
+    };
+    track.callback = el.requestVideoFrameCallback(onFrame);
+  }
+  function stopTracking(el) {
+    const track = frameTracks.get(el);
+    if (track && el.cancelVideoFrameCallback) el.cancelVideoFrameCallback(track.callback);
+    frameTracks.delete(el);
+  }
+  function frameVersion(el) {
+    return el.requestVideoFrameCallback ? (frameTracks.get(el)?.version || 0) : el.currentTime;
+  }
   // Mark a slot ready when the element presents its first real frame for this load.
   function watchFirstFrame(slot, gen) {
     const el = slot.el;
     const ok = () => { if (slot.gen === gen && slot.el === el) slot.videoReady = true; };
-    if (el.requestVideoFrameCallback) el.requestVideoFrameCallback(ok);
-    else el.addEventListener("loadeddata", ok, { once: true });
+    trackVideo(el);
+    if (!el.requestVideoFrameCallback) el.addEventListener("loadeddata", ok, { once: true });
   }
   function clearVideo(el) {
+    stopTracking(el);
     el.pause();
     el.removeAttribute("src");
     el.load();
@@ -676,6 +699,7 @@ void main() {
       const el = preview.el;
       el.crossOrigin = "anonymous"; el.muted = true; el.loop = true; el.preload = "auto";
       el.src = assetURL(place.video);
+      trackVideo(el);
       el.play().catch(() => {});
     }, reduced() ? 0 : 120);
   }
@@ -764,9 +788,13 @@ void main() {
       Object.assign(slot, { place, hasContent: true, videoReady: true, posterReady: false, tainted: false, failed: false, lastT: -1, loadT: performance.now(), gen: (slot.gen || 0) + 1, asp: slot.el.videoWidth / slot.el.videoHeight || 16 / 9 });
       playEl(slot.el);
     } else loadSlot(slot, place, true);
+    // A selected film owns the decoder budget. Stop any unrelated hover preview.
+    clearTimeout(preview.timer); clearTimeout(preview.idleTimer);
+    preview.timer = 0; preview.idleTimer = 0;
+    clearVideo(preview.el); preview.place = null;
     S.next = slot;
     S.surf = { cur: null, old: null, t0: 0 };
-    S.hole.r = 0; S.hole.holdUntil = performance.now() + (reduced() ? 0 : 1300);
+    S.hole.r = 0; S.hole.holdUntil = performance.now() + (reduced() ? 0 : WIPE_MS);
     // Feather relay: the next stop arrives from the side the last one left by, sliding in.
     const fd = !f0 && (featherDir(fromPlace, place) || opt.side);
     let slide = null;
@@ -825,6 +853,7 @@ void main() {
   }
 
   function closeVideo() {
+    els.details.open = false;
     if (!S.cur && !S.next) return;
     if (S.next) { unloadSlot(S.next); S.next = null; S.reveal = null; }
     if (!S.cur) { finishClose(); return; }
@@ -869,6 +898,7 @@ void main() {
   }
   let lineText = null;
   function showPanel(place) {
+    els.details.open = false;
     els.name.textContent = place.country && place.country !== place.name ? `${place.name}, ${place.country}` : place.name;
     const local = fmtLocal(place.localTime);
     els.asof.textContent = [S.moment || fmtDate(place.asOf), local && `${local} local`].filter(Boolean).join(" · ");
@@ -896,8 +926,8 @@ void main() {
     els.music.textContent = music ? `Music: ${music}` : "";
     const w = neighbor(place, -1), e = neighbor(place, 1);
     els.prev.hidden = !w; els.next.hidden = !e;
-    if (w) { els.prev.querySelector(".nav-name").textContent = w.name; els.prev.setAttribute("aria-label", `West to ${w.name}`); }
-    if (e) { els.next.querySelector(".nav-name").textContent = e.name; els.next.setAttribute("aria-label", `East to ${e.name}`); }
+    if (w) { els.prev.querySelector(".nav-name").textContent = w.name; els.prev.setAttribute("aria-label", `West to ${w.name}`); els.prev.title = `West to ${w.name}`; }
+    if (e) { els.next.querySelector(".nav-name").textContent = e.name; els.next.setAttribute("aria-label", `East to ${e.name}`); els.next.title = `East to ${e.name}`; }
     const call = callOf(place);
     els.call.hidden = !call; els.call.classList.remove("is-on");
     if (call) { els.call.querySelector(".nav-name").textContent = call.other.name; els.call.dataset.target = call.other.id; els.call.setAttribute("aria-label", `Over to ${call.other.name}`); }
@@ -931,31 +961,17 @@ void main() {
   }
 
   // ---------- card <-> note ----------
-  // The card folds into a small wall label; the same white sheet travels between the two.
-  function foldSheet(from, to, radii, done) {
-    if (reduced() || !els.fold.animate) { done(); return; }
-    const f = els.fold;
-    f.style.display = "block";
-    const kf = (r, rad) => ({ left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px", borderRadius: rad + "px" });
-    const a = f.animate([kf(from, radii[0]), kf(to, radii[1])], { duration: 440, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)", fill: "forwards" });
-    a.onfinish = () => {
-      done();
-      const b = f.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, fill: "forwards" });
-      b.onfinish = () => { f.style.display = "none"; a.cancel(); b.cancel(); };
-    };
-  }
+  const mqNarrow = window.matchMedia("(max-width: 899px)");
   function minimizeCard(pan = true) {
     if (!S.cardOpen) return;
     S.cardOpen = false;
     const hadFocus = els.card.contains(document.activeElement);
-    const from = els.card.getBoundingClientRect();
-    els.note.classList.toggle("is-compact", mqNarrow.matches);
-    const to = els.note.getBoundingClientRect();
     els.card.classList.add("is-min");
     els.card.setAttribute("aria-hidden", "true");
     els.card.inert = true;
     els.noteOpen.setAttribute("aria-expanded", "false");
-    foldSheet(from, to, [16, mqNarrow.matches ? 10 : 8], () => els.note.classList.add("is-on"));
+    els.note.classList.toggle("is-compact", mqNarrow.matches);
+    els.note.classList.add("is-on");
     if (hadFocus) els.noteOpen.focus({ preventScroll: true });
     if (pan && !S.cur && !S.next && !S.userMoved) setView(worldView(), true);
     updateHint();
@@ -963,22 +979,21 @@ void main() {
   function openCard() {
     if (S.cardOpen) return;
     S.cardOpen = true;
-    const from = els.note.getBoundingClientRect();
     els.note.classList.remove("is-on");
     els.noteOpen.setAttribute("aria-expanded", "true");
     els.card.inert = false;
     els.card.removeAttribute("aria-hidden");
-    // measure the card where it will land (its closed transform is only a small offset)
-    const cr = els.card.getBoundingClientRect();
-    const to = { left: (S.W - cr.width) / 2, top: (S.H - cr.height) / 2, width: cr.width, height: cr.height };
-    foldSheet(from, to, [8, 16], () => els.card.classList.remove("is-min"));
+    els.card.classList.remove("is-min");
     els.card.focus({ preventScroll: true });
     if (!S.cur && !S.next) { S.userMoved = false; setView(cardView(), true); }
     updateHint();
   }
   els.note.addEventListener("click", (e) => {
     if (e.target.closest("a")) return;
-    if (els.note.classList.contains("is-compact")) { els.note.classList.remove("is-compact"); return; }
+    if (els.note.classList.contains("is-compact")) {
+      els.note.classList.remove("is-compact");
+      return;
+    }
     openCard();
   });
   function updateHint() {
@@ -1049,9 +1064,13 @@ void main() {
     const s = S.next || S.cur; if (s && s.el.paused) s.el.play().catch(() => {});
   });
   syncSound();
+  document.addEventListener("pointerdown", (e) => {
+    if (els.details.open && !els.details.contains(e.target)) els.details.open = false;
+  });
   document.addEventListener("keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === "Escape") {
+      if (els.details.open) { els.details.open = false; els.details.querySelector("summary").focus(); return; }
       if (S.cardOpen) minimizeCard(true); else if (S.cur || S.next) closeVideo();
     } else if ((e.key === "ArrowRight" || e.key === "ArrowLeft") && playing()) {
       e.preventDefault(); flip(e.key === "ArrowRight" ? 1 : -1);
@@ -1059,17 +1078,20 @@ void main() {
   });
 
   // ---------- frame loop ----------
+  let renderScale = 1.5;
+  const frameHealth = { samples: 0, elapsed: 0 };
   function resize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const W = window.innerWidth, H = window.innerHeight;
+    // Bound fill-rate on Retina laptops; text stays native-resolution DOM.
+    const dpr = Math.min(window.devicePixelRatio || 1, renderScale, Math.sqrt(3000000 / (W * H)));
     if (W === S.W && H === S.H && dpr === S.dpr) return;
-    const first = !S.W;
+    const first = !S.W, viewportChanged = W !== S.W || H !== S.H;
     S.W = W; S.H = H; S.dpr = dpr;
+    if (!S.cardOpen) els.note.classList.toggle("is-compact", mqNarrow.matches);
     mapCv.width = Math.round(W * dpr); mapCv.height = Math.round(H * dpr);
     if (gl) { els.stage.width = mapCv.width; els.stage.height = mapCv.height; }
     else { mapCv.style.width = W + "px"; mapCv.style.height = H + "px"; }
-    if (!first && S.raster && !S.userMoved) setView(S.cardOpen && !S.cur ? cardView() : worldView(), false);
-    if (!S.cardOpen) els.note.classList.toggle("is-compact", mqNarrow.matches);
+    if (!first && viewportChanged && S.raster && !S.userMoved) setView(S.cardOpen && !S.cur ? cardView() : worldView(), false);
     S.mapDirty = true;
   }
 
@@ -1107,9 +1129,9 @@ void main() {
     // live frames from the preview video
     const pc = sf.cur, el = preview.el;
     if (gl && pc && preview.place === pc.place && el.readyState >= 2 && el.videoWidth) {
-      if (el.currentTime !== preview.lastT) {
+      if (frameVersion(el) !== preview.lastT) {
         try { upload(vidTex[pc.vt], el); preview.frames++; } catch (_) {}
-        preview.lastT = el.currentTime;
+        preview.lastT = frameVersion(el);
         if (preview.frames >= 2) pc.vidOn = true;
       }
     }
@@ -1151,7 +1173,19 @@ void main() {
   let lastPreload = { x: -1e4, y: -1e4 };
   function frame(now) {
     requestAnimationFrame(frame);
-    const dt = Math.min(64, now - S.lastT); S.lastT = now;
+    const elapsed = now - S.lastT;
+    const dt = Math.min(64, elapsed); S.lastT = now;
+    if (document.hidden) return;
+    // Sustained slow rendering lowers canvas resolution, never input frequency.
+    if (gl && elapsed < 100 && elapsed > 0) {
+      frameHealth.samples++; frameHealth.elapsed += elapsed;
+      if (frameHealth.samples >= 90) {
+        if (frameHealth.elapsed / frameHealth.samples > 26 && renderScale > 0.75) {
+          renderScale = Math.max(0.75, renderScale - 0.25); resize();
+        }
+        frameHealth.samples = 0; frameHealth.elapsed = 0;
+      }
+    }
     const motion = !reduced();
     stepView(now);
 
@@ -1159,17 +1193,18 @@ void main() {
     for (const slot of [S.cur, S.next, S.closing && S.closing.slot]) {
       if (!slot || !slot.place || slot.tainted) continue;
       const el = slot.el;
+      if (el.requestVideoFrameCallback && frameVersion(el) > 0) slot.videoReady = true;
       if (slot.videoReady && el.readyState >= 2 && el.videoWidth) {
         if (gl) {
-          if (el.currentTime !== slot.lastT) {
+          if (frameVersion(el) !== slot.lastT) {
             try { upload(slot.tex, el); } catch (_) { slot.tainted = true; continue; }
-            slot.lastT = el.currentTime;
+            slot.lastT = frameVersion(el);
           }
         } else el.classList.add("is-on");
         slot.asp = el.videoWidth / el.videoHeight; slot.hasContent = true;
       }
     }
-    if (S.next && !S.next.hasContent && S.next.posterReady && now - S.next.loadT > 900) S.next.hasContent = true;
+    if (S.next && !S.next.hasContent && S.next.posterReady) S.next.hasContent = true;
     if (S.next && S.next.hasContent && S.reveal && !S.reveal.t0) {
       S.reveal.t0 = now;
       if (S.reveal.panel) { showPanel(S.reveal.panel); S.reveal.panel = null; }
@@ -1360,12 +1395,8 @@ void main() {
       S.pointer = { x: +params.get("hx") * S.W, y: +(params.get("hy") || 0.5) * S.H, inside: true, type: "mouse" };
       S.hole.x = S.pointer.x; S.hole.y = S.pointer.y; S.lastMove = performance.now();
     }
-    // Warm the lens: every poster, a few at a time, once the page is idle.
-    if (gl) {
-      const queue = S.places.slice();
-      const pump = () => { for (let i = 0; i < 3 && queue.length; i++) posterTex(queue.shift()); if (queue.length) setTimeout(pump, 400); };
-      setTimeout(pump, 1500);
-    }
+    // Posters warm on proximity in preloadNear, keeping bandwidth available for
+    // the film the visitor actually selects instead of fetching the whole atlas.
   }
 
   // Debug surface for verification scripts.
