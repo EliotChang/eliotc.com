@@ -73,6 +73,8 @@
   const reduced = () => mqReduced.matches;
   const playing = () => !!(S.cur || S.next) && !S.closing;
   const lensR = () => (playing() ? (S.W < 560 ? 72 : 80) : (S.W < 560 ? 92 : 110));
+  // Touch: the lens floats above the finger, like a loupe, so the thumb never covers it.
+  const lensLift = (y) => (S.pointer.type === "mouse" ? 0 : Math.min(lensR() + 28, Math.max(0, y - lensR() * 0.6)));
 
   // ---------- projection ----------
   function project(lng, lat, v = S.view) {
@@ -149,8 +151,15 @@
   // the world view, prefer a centre as far north as possible (so the landing still reads
   // as a world map), paying a small cost for zooming in; require some clearance so the
   // card never grazes a coast.
+  // The solve takes ~100ms (several hundred on phones), so it is kept per layout.
+  const cardViews = new Map();
   function cardView() {
     const cw = els.card.offsetWidth, ch = els.card.offsetHeight;
+    const key = `${S.W}x${S.H}:${cw}x${ch}`;
+    if (!cardViews.has(key)) cardViews.set(key, solveCardView(cw, ch));
+    return { ...cardViews.get(key) };
+  }
+  function solveCardView(cw, ch) {
     const m = S.W < 560 ? 16 : 28;
     const s0 = worldView().s, step = 0.5;
     const yLo = ym(-48), yHi = ym(36);
@@ -1009,7 +1018,7 @@ void main() {
     S.down = { id: e.pointerId, x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, moved: false, type: t };
     try { els.stage.setPointerCapture(e.pointerId); } catch (_) {}
     if (mqNarrow.matches && !S.cardOpen) els.note.classList.add("is-compact");
-    if (t !== "mouse") { S.hole.hideAt = 0; if (S.hole.r < 1) { S.hole.x = e.clientX; S.hole.y = e.clientY; } }
+    if (t !== "mouse") { S.hole.hideAt = 0; if (S.hole.r < 1) { S.hole.x = e.clientX; S.hole.y = e.clientY - lensLift(e.clientY); } }
   }
   function onMove(e) {
     const t = e.pointerType || "mouse";
@@ -1038,9 +1047,12 @@ void main() {
     if (d.moved && d.type === "mouse") return;
     tap(e.clientX, e.clientY);
   }
+  // Open what the lens is showing; with no lens up, only a place right under the tap.
   function tap(x, y) {
+    const c = S.surf.cur;
+    if (c && c.alpha > 0.25) { select(c.place, x, y, { fromLens: true }); return; }
     const hit = pickAt(x, y);
-    if (hit) { select(hit.place, x, y, { fromLens: true }); return; }
+    if (hit && hit.d < 44) { select(hit.place, x, y, { fromLens: true }); return; }
     if (S.cardOpen) minimizeCard(true);
   }
 
@@ -1158,7 +1170,8 @@ void main() {
         if (local) { const sm = document.createElement("small"); sm.textContent = local; span.append(sm); }
         els.tip.replaceChildren(span);
       }
-      if (y > S.H - 28) y = H.y - H.r - 26;
+      // Touch puts the label above the lens, clear of the hand; the mouse keeps it below.
+      if ((gl && S.pointer.type !== "mouse" && H.y - H.r - 26 > 8) || y > S.H - 28) y = H.y - H.r - 26;
       els.tip.style.transform = `translate(${clamp(x, 60, S.W - 60)}px, ${y}px)`;
       els.tip.classList.add("is-on");
     } else els.tip.classList.remove("is-on");
@@ -1238,7 +1251,7 @@ void main() {
     }
     const k = motion ? 1 - Math.exp(-dt / 70) : 1;
     const px = H.x, py = H.y;
-    if (P.inside || touchHeld) { H.x += (P.x - H.x) * k; H.y += (P.y - H.y) * k; }
+    if (P.inside || touchHeld) { H.x += (P.x - H.x) * k; H.y += (P.y - lensLift(P.y) - H.y) * k; }
     const sp = gl ? stepSurface(now, dt, lensOn) : 1;
     // During a film the lens rests as a faint ring after 1.5s of stillness, and swells a
     // little when a place is within reach ("click jumps here").
