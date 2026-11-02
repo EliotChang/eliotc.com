@@ -56,18 +56,19 @@
 </div>
 
 <div class="panel" id="panel" aria-live="polite">
+  <p class="p-story" id="p-story" hidden><span class="ps-title"></span> <span class="ps-count"><span class="ps-bar" aria-hidden="true"><i></i></span><span class="ps-n"></span></span></p>
   <h2 class="p-name" id="p-name"></h2>
   <p class="p-line" id="p-line"></p>
   <div class="p-nav" id="p-nav">
     <button class="nav" id="prev" type="button" aria-keyshortcuts="ArrowLeft"><span aria-hidden="true">←</span> <span class="nav-name"></span></button>
     <button class="nav" id="next" type="button" aria-keyshortcuts="ArrowRight"><span class="nav-name"></span> <span aria-hidden="true">→</span></button>
+    <button class="nav story" id="thread" type="button" hidden><span class="nav-name"></span> <span aria-hidden="true">→</span></button>
     <details class="p-details" id="p-details">
       <summary>Scene details</summary>
       <div class="p-context">
         <p class="p-asof" id="p-asof"></p>
         <p class="p-sources" id="p-sources"></p>
         <p class="p-music" id="p-music"></p>
-        <button class="nav thread" id="thread" type="button" hidden></button>
       </div>
     </details>
     <button class="nav call" id="call" type="button" hidden><span aria-hidden="true">→</span> <span class="nav-name"></span></button>

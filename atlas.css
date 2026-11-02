@@ -6,6 +6,8 @@
   --rule: #ebebe8;
   --on-dark: #efeee9;
   --on-dark-muted: rgba(239, 238, 233, 0.62);
+  --thread: #e2c49e;
+  --thread-muted: rgba(226, 196, 158, 0.72);
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --gutter: 24px;
 }
@@ -159,7 +161,7 @@ button { font: inherit; letter-spacing: inherit; }
   color: rgba(239, 238, 233, 0.82); text-wrap: pretty; transition: opacity 0.25s;
 }
 .p-line.is-swap { opacity: 0; transition-duration: 0.16s; }
-.p-nav { display: flex; align-items: center; gap: 6px; margin-top: 12px; pointer-events: auto; }
+.p-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; pointer-events: auto; }
 .nav {
   display: inline-flex; align-items: center; justify-content: center;
   min-height: 36px; padding: 0 8px; border: 0; border-radius: 8px; background: none;
@@ -190,7 +192,17 @@ button { font: inherit; letter-spacing: inherit; }
 .p-sources a { color: var(--on-dark); text-underline-offset: 4px; text-decoration-color: rgba(239, 238, 233, 0.3); }
 .p-music { margin: 12px 0 0; font-size: 12px; color: var(--on-dark-muted); }
 .p-sources:empty, .p-music:empty, .p-asof:empty { display: none; }
-.thread { width: 100%; justify-content: flex-start; text-align: left; padding: 12px 0 0; margin-top: 14px; border-top: 1px solid rgba(239, 238, 233, 0.14); border-radius: 0; }
+/* The story this place belongs to: named above the place, with how much of it this viewer has seen. */
+.p-story {
+  margin: 0 0 6px; max-width: 46ch; font-size: 13px; line-height: 1.45;
+  color: var(--thread); text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
+.p-story[hidden] { display: none; }
+.ps-count { display: inline-flex; align-items: center; gap: 7px; margin-left: 6px; color: var(--thread-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ps-bar { width: 28px; height: 3px; border-radius: 2px; background: rgba(226, 196, 158, 0.25); overflow: hidden; }
+.ps-bar i { display: block; height: 100%; background: var(--thread); transition: width 0.6s var(--ease); }
+.nav.story { gap: 6px; color: var(--thread); border: 1px solid rgba(226, 196, 158, 0.32); padding: 0 10px; }
+.nav.story:hover { color: var(--thread); background: rgba(226, 196, 158, 0.1); }
 /* A narrative invitation appears only while its shot is active. */
 .call { display: none; }
 .call.is-on { display: inline-flex; }

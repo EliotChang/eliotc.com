@@ -35,7 +35,7 @@
   const els = {
     stage: $("#stage"), card: $("#card"), note: $("#note"), noteOpen: $("#note-open"),
     panel: $("#panel"), details: $("#p-details"), name: $("#p-name"), asof: $("#p-asof"), line: $("#p-line"), sources: $("#p-sources"),
-    music: $("#p-music"), prev: $("#prev"), call: $("#call"), glint: $("#glint"), next: $("#next"), thread: $("#thread"),
+    music: $("#p-music"), prev: $("#prev"), call: $("#call"), glint: $("#glint"), next: $("#next"), thread: $("#thread"), story: $("#p-story"),
     mute: $("#mute"), close: $("#close"), hint: $("#hint"), tip: $("#tip"),
   };
 
@@ -50,7 +50,7 @@
     landPath: null,
     raster: null,             // prefix-sum land raster for the card framing solver
     places: [], manifestBase: null, threads: new Map(), moment: "",
-    calls: [], featherPath: [], finale: null, edges: [],
+    calls: [], featherPath: [], finale: null, edges: [], baseEdges: [], storyRoutes: new Map(), lastStory: null, panelPlace: null,
     watched: new Set(), drawn: new Set(), lineAnims: new Map(), route: null, glint: 0,
     pin: null, hot: null,
     mapDirty: true,
@@ -230,29 +230,67 @@
   for (const id of store.get(KEY_W) || []) if (typeof id === "string") S.watched.add(id);
   for (const k of store.get(KEY_D) || []) if (typeof k === "string") S.drawn.add(k);
 
-  // Connections: places sharing a thread, the two ends of a call, consecutive feather stops.
+  // Connections: the two ends of a call, consecutive feather stops, and each story's route.
+  const edgeKey = (kind, a, b) => (a < b ? { key: `${kind}:${a}|${b}`, kind, a, b } : { key: `${kind}:${b}|${a}`, kind, a: b, b: a });
   function buildEdges(ids) {
     const out = new Map();
     const add = (a, b, kind) => {
       if (!a || !b || a === b || !ids.has(a) || !ids.has(b)) return;
-      const [x, y] = a < b ? [a, b] : [b, a], key = `${kind}:${x}|${y}`;
-      if (!out.has(key)) out.set(key, { key, kind, a: x, b: y });
+      const e = edgeKey(kind, a, b);
+      if (!out.has(e.key)) out.set(e.key, e);
     };
-    const byThread = new Map();
-    for (const p of S.places) for (const t of Array.isArray(p.threads) ? p.threads : []) {
-      if (!byThread.has(t)) byThread.set(t, []);
-      byThread.get(t).push(p.id);
-    }
-    for (const list of byThread.values()) for (let i = 0; i < list.length; i++) for (let k = i + 1; k < list.length; k++) add(list[i], list[k], "thread");
     for (const c of S.calls) add(c.places[0], c.places[1], "call");
     for (let i = 1; i < S.featherPath.length; i++) add(S.featherPath[i - 1], S.featherPath[i], "feather");
     return [...out.values()];
+  }
+  // A story is drawn as one route: its places as a short open tour, starting at the western
+  // end (after the widest gap in longitude), nearest-next, then uncrossed with 2-opt.
+  function storyRoute(places) {
+    const dist = (a, b) => Math.hypot(wrap180(b.lng - a.lng) * Math.cos((a.lat + b.lat) / 2 * RAD), b.lat - a.lat);
+    const s = places.slice().sort((a, b) => a.lng - b.lng);
+    let gi = 0, gap = -1;
+    for (let i = 0; i < s.length; i++) { const g = ((s[(i + 1) % s.length].lng - s[i].lng) + 360) % 360; if (g > gap) { gap = g; gi = i; } }
+    const left = s.slice(gi + 1).concat(s.slice(0, gi + 1)), r = [left.shift()];
+    while (left.length) {
+      const end = r[r.length - 1];
+      let bi = 0;
+      left.forEach((p, i) => { if (dist(end, p) < dist(end, left[bi])) bi = i; });
+      r.push(left.splice(bi, 1)[0]);
+    }
+    for (let pass = 0, better = true; better && pass < 20; pass++) {
+      better = false;
+      for (let i = 0; i < r.length - 2; i++) for (let k = i + 2; k < r.length - 1; k++) {
+        if (dist(r[i], r[k]) + dist(r[i + 1], r[k + 1]) < dist(r[i], r[i + 1]) + dist(r[k], r[k + 1]) - 1e-9) {
+          r.splice(i + 1, k - i, ...r.slice(i + 1, k + 1).reverse()); better = true;
+        }
+      }
+    }
+    return r;
+  }
+  // Earned story lines join the watched places of a story in route order.
+  function storyEdges() {
+    const out = [];
+    for (const r of S.storyRoutes.values()) {
+      const seen = r.filter((p) => S.watched.has(p.id));
+      for (let i = 1; i < seen.length; i++) out.push(edgeKey("thread", seen[i - 1].id, seen[i].id));
+    }
+    return out;
+  }
+  const refreshEdges = () => { S.edges = S.baseEdges.concat(storyEdges()); };
+  // The next place on a story: the first unwatched one after this along the route.
+  function storyNext(place, r) {
+    const i = r.findIndex((p) => p.id === place.id), n = r.length;
+    for (let k = 1; k < n; k++) { const p = r[(i + k) % n]; if (!S.watched.has(p.id)) return p; }
+    return r[(i + 1) % n];
   }
   const placeById = (id) => S.places.find((p) => p.id === id);
   function markWatched(place) {
     if (!place || S.watched.has(place.id) || !placeById(place.id)) return;
     S.watched.add(place.id);
     store.set(KEY_W, [...S.watched]);
+    if (placeThreads(place).length) S.lastStory = place.id;
+    refreshEdges();
+    if (S.panelPlace) updateStory(S.panelPlace);
     S.mapDirty = true;
   }
   const edgeEarned = (e) => S.watched.has(e.a) && S.watched.has(e.b);
@@ -316,6 +354,14 @@
       const st = LINE_STYLE[e.kind];
       mctx.strokeStyle = st.color; mctx.setLineDash(st.dash);
       each(e, (ax, ay, bx, by) => strokeCurve(ax, ay, bx, by, st.bend, 0, p));
+    }
+    // From the last story place watched, a short dotted start toward the next one to find.
+    const from = S.lastStory && placeById(S.lastStory), th = from && placeThreads(from)[0], r = th && S.storyRoutes.get(th.id);
+    const to = r && storyNext(from, r);
+    if (to && !S.watched.has(to.id)) {
+      const e = edgeKey("thread", from.id, to.id), fwd = e.a === from.id;
+      mctx.strokeStyle = "rgba(226,196,158,0.5)"; mctx.setLineDash([2, 4]);
+      each(e, (ax, ay, bx, by) => strokeCurve(ax, ay, bx, by, LINE_STYLE.thread.bend, fwd ? 0 : 0.6, fwd ? 0.4 : 1));
     }
     mctx.setLineDash([]);
     // after the finale: the whole route draws itself once, brighter, then settles
@@ -940,16 +986,24 @@ void main() {
     const call = callOf(place);
     els.call.hidden = !call; els.call.classList.remove("is-on");
     if (call) { els.call.querySelector(".nav-name").textContent = call.other.name; els.call.dataset.target = call.other.id; els.call.setAttribute("aria-label", `Over to ${call.other.name}`); }
-    // Threads: a tiny tag that jumps to the next place (eastward) on the same story.
-    els.thread.hidden = true; els.thread.dataset.target = "";
-    for (const th of placeThreads(place)) {
-      const to = neighbor(place, 1, (p) => Array.isArray(p.threads) && p.threads.includes(th.id));
-      if (!to) continue;
-      els.thread.textContent = `${th.title} → ${to.name}`;
-      els.thread.setAttribute("aria-label", `Thread: ${th.title}. Next: ${to.name}`);
-      els.thread.dataset.target = to.id; els.thread.hidden = false;
-      break;
-    }
+    S.panelPlace = place;
+    updateStory(place);
+  }
+  // The story this place is on: named above the place, with this viewer's progress through
+  // it, and a button to the next place on it.
+  function updateStory(place) {
+    const th = placeThreads(place)[0], r = th && S.storyRoutes.get(th.id);
+    els.story.hidden = !r; els.thread.hidden = !r; els.thread.dataset.target = "";
+    if (!r) return;
+    const seen = r.filter((p) => S.watched.has(p.id)).length;
+    els.story.querySelector(".ps-title").textContent = th.title;
+    els.story.querySelector(".ps-n").textContent = `${seen} of ${r.length}`;
+    els.story.querySelector(".ps-bar i").style.width = `${(100 * seen) / r.length}%`;
+    const to = storyNext(place, r);
+    els.thread.querySelector(".nav-name").textContent = to.name;
+    els.thread.dataset.target = to.id;
+    els.thread.setAttribute("aria-label", `Next on this story: ${to.name}`);
+    els.thread.title = `Next on this story: ${to.name}`;
   }
   function setLine(text) {
     if (text === lineText) return;
@@ -1363,7 +1417,12 @@ void main() {
     S.calls = (Array.isArray(m.calls) ? m.calls : []).filter((c) => c && Array.isArray(c.places) && c.places.length === 2);
     S.featherPath = m.feather && Array.isArray(m.feather.path) ? m.feather.path.filter((id) => typeof id === "string") : [];
     S.finale = m.finale && m.finale.video ? { ...m.finale, video: new URL(m.finale.video, finaleBase).href, poster: m.finale.poster ? new URL(m.finale.poster, finaleBase).href : "" } : null;
-    S.edges = buildEdges(ids);
+    for (const id of S.threads.keys()) {
+      const on = S.places.filter((p) => Array.isArray(p.threads) && p.threads.includes(id));
+      if (on.length > 1) S.storyRoutes.set(id, storyRoute(on));
+    }
+    S.baseEdges = buildEdges(ids);
+    refreshEdges();
   }
 
   async function boot() {
@@ -1388,7 +1447,7 @@ void main() {
     if (manRes.status === "rejected") console.warn("atlas: manifest failed to load", manRes.reason);
     await fontsReady;
 
-    if (params.get("unlock") === "1") { for (const id of S.featherPath) if (placeById(id)) S.watched.add(id); store.set(KEY_W, [...S.watched]); }
+    if (params.get("unlock") === "1") { for (const id of S.featherPath) if (placeById(id)) S.watched.add(id); store.set(KEY_W, [...S.watched]); refreshEdges(); }
     const debugPlace = params.get("place") && S.places.find((p) => p.id === params.get("place"));
     if (params.get("card") === "min" || debugPlace) {
       minimizeCard(false);
