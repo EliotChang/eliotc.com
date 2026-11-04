@@ -243,29 +243,38 @@
     for (let i = 1; i < S.featherPath.length; i++) add(S.featherPath[i - 1], S.featherPath[i], "feather");
     return [...out.values()];
   }
-  // A story is drawn as one route: its places as a short open tour, starting at the western
-  // end (after the widest gap in longitude), nearest-next, then uncrossed with 2-opt.
+  // A story is drawn as one route: the shortest open tour found by nearest-next from every
+  // start, uncrossed with 2-opt (either end may move), then read from its western end.
   function storyRoute(places) {
     const dist = (a, b) => Math.hypot(wrap180(b.lng - a.lng) * Math.cos((a.lat + b.lat) / 2 * RAD), b.lat - a.lat);
-    const s = places.slice().sort((a, b) => a.lng - b.lng);
-    let gi = 0, gap = -1;
-    for (let i = 0; i < s.length; i++) { const g = ((s[(i + 1) % s.length].lng - s[i].lng) + 360) % 360; if (g > gap) { gap = g; gi = i; } }
-    const left = s.slice(gi + 1).concat(s.slice(0, gi + 1)), r = [left.shift()];
-    while (left.length) {
-      const end = r[r.length - 1];
-      let bi = 0;
-      left.forEach((p, i) => { if (dist(end, p) < dist(end, left[bi])) bi = i; });
-      r.push(left.splice(bi, 1)[0]);
-    }
-    for (let pass = 0, better = true; better && pass < 20; pass++) {
-      better = false;
-      for (let i = 0; i < r.length - 2; i++) for (let k = i + 2; k < r.length - 1; k++) {
-        if (dist(r[i], r[k]) + dist(r[i + 1], r[k + 1]) < dist(r[i], r[i + 1]) + dist(r[k], r[k + 1]) - 1e-9) {
-          r.splice(i + 1, k - i, ...r.slice(i + 1, k + 1).reverse()); better = true;
+    const d = (a, b) => (a && b ? dist(a, b) : 0), n = places.length;
+    const len = (r) => r.slice(1).reduce((s, p, i) => s + dist(r[i], p), 0);
+    let best = null, bestLen = Infinity;
+    for (const start of places) {
+      const left = places.filter((p) => p !== start), r = [start];
+      while (left.length) {
+        const end = r[r.length - 1];
+        let bi = 0;
+        left.forEach((p, i) => { if (dist(end, p) < dist(end, left[bi])) bi = i; });
+        r.push(left.splice(bi, 1)[0]);
+      }
+      for (let pass = 0, better = true; better && pass < 50; pass++) {
+        better = false;
+        for (let i = -1; i < n - 1; i++) for (let k = i + 2; k < n; k++) {
+          if (d(r[i], r[k]) + d(r[i + 1], r[k + 1]) < d(r[i], r[i + 1]) + d(r[k], r[k + 1]) - 1e-9) {
+            r.splice(i + 1, k - i, ...r.slice(i + 1, k + 1).reverse()); better = true;
+          }
         }
       }
+      const L = len(r);
+      if (L < bestLen - 1e-9) { bestLen = L; best = r; }
     }
-    return r;
+    // West is measured from the widest empty gap in longitude, so routes across the date line read right.
+    const s = places.map((p) => p.lng).sort((a, b) => a - b);
+    let gap = -1, west = s[0];
+    for (let i = 0; i < n; i++) { const g = ((s[(i + 1) % n] - s[i]) + 360) % 360 || 360; if (g > gap) { gap = g; west = s[(i + 1) % n]; } }
+    const off = (p) => ((p.lng - west) + 360) % 360;
+    return off(best[0]) <= off(best[n - 1]) ? best : best.reverse();
   }
   // Earned story lines join the watched places of a story in route order.
   function storyEdges() {
