@@ -50,7 +50,7 @@
     landPath: null,
     raster: null,             // prefix-sum land raster for the card framing solver
     places: [], manifestBase: null, threads: new Map(), moment: "",
-    calls: [], featherPath: [], finale: null, edges: [], baseEdges: [], storyRoutes: new Map(), lastStory: null, panelPlace: null,
+    calls: [], featherPath: [], finale: null, edges: [], baseEdges: [], storyRoutes: new Map(), panelPlace: null,
     watched: new Set(), drawn: new Set(), lineAnims: new Map(), route: null, glint: 0,
     pin: null, hot: null,
     mapDirty: true,
@@ -276,12 +276,22 @@
     const off = (p) => ((p.lng - west) + 360) % 360;
     return off(best[0]) <= off(best[n - 1]) ? best : best.reverse();
   }
-  // Earned story lines join the watched places of a story in route order.
+  // An earned story line is a leg of the route whose two places have both been watched;
+  // a leg with only one end watched shows as a short dotted start from that end instead.
   function storyEdges() {
     const out = [];
     for (const r of S.storyRoutes.values()) {
-      const seen = r.filter((p) => S.watched.has(p.id));
-      for (let i = 1; i < seen.length; i++) out.push(edgeKey("thread", seen[i - 1].id, seen[i].id));
+      for (let i = 1; i < r.length; i++) if (S.watched.has(r[i - 1].id) && S.watched.has(r[i].id)) out.push(edgeKey("thread", r[i - 1].id, r[i].id));
+    }
+    return out;
+  }
+  function storyStarts() {
+    const out = [];
+    for (const r of S.storyRoutes.values()) {
+      for (let i = 1; i < r.length; i++) {
+        const a = S.watched.has(r[i - 1].id), b = S.watched.has(r[i].id);
+        if (a !== b) out.push(a ? [r[i - 1], r[i]] : [r[i], r[i - 1]]);
+      }
     }
     return out;
   }
@@ -297,7 +307,6 @@
     if (!place || S.watched.has(place.id) || !placeById(place.id)) return;
     S.watched.add(place.id);
     store.set(KEY_W, [...S.watched]);
-    if (placeThreads(place).length) S.lastStory = place.id;
     refreshEdges();
     if (S.panelPlace) updateStory(S.panelPlace);
     S.mapDirty = true;
@@ -322,9 +331,9 @@
   const featherComplete = () => S.featherPath.length > 1 && S.featherPath.every((id) => placeById(id) && S.watched.has(id));
 
   const LINE_STYLE = {
-    thread: { color: "rgba(226,196,158,0.34)", dash: [], bend: 0.14 },
-    call: { color: "rgba(160,192,226,0.34)", dash: [], bend: -0.14 },
-    feather: { color: "rgba(239,238,233,0.34)", dash: [3, 4], bend: 0 },
+    thread: { color: "rgba(226,196,158,0.58)", dash: [], bend: 0.14, width: 1.1 },
+    call: { color: "rgba(160,192,226,0.34)", dash: [], bend: -0.14, width: 0.8 },
+    feather: { color: "rgba(239,238,233,0.34)", dash: [3, 4], bend: 0, width: 0.8 },
   };
   // A gentle arc between two places, taking the short way across the date line.
   function edgePoints(a, b) {
@@ -353,7 +362,7 @@
         fn(ax + o, ay, bx + o, by);
       }
     };
-    mctx.lineWidth = 0.8; mctx.lineCap = "round";
+    mctx.lineCap = "round";
     for (const e of S.edges) {
       if (!edgeEarned(e)) continue;
       let p = 0;
@@ -361,16 +370,18 @@
       else if (S.lineAnims.has(e.key)) p = easeInOut(clamp((now - S.lineAnims.get(e.key)) / LINE_MS, 0, 1));
       if (p <= 0) continue;
       const st = LINE_STYLE[e.kind];
-      mctx.strokeStyle = st.color; mctx.setLineDash(st.dash);
+      mctx.strokeStyle = st.color; mctx.setLineDash(st.dash); mctx.lineWidth = st.width;
       each(e, (ax, ay, bx, by) => strokeCurve(ax, ay, bx, by, st.bend, 0, p));
     }
-    // From the last story place watched, a short dotted start toward the next one to find.
-    const from = S.lastStory && placeById(S.lastStory), th = from && placeThreads(from)[0], r = th && S.storyRoutes.get(th.id);
-    const to = r && storyNext(from, r);
-    if (to && !S.watched.has(to.id)) {
+    // Dotted starts from a watched place toward its unwatched route neighbours:
+    // 22-64px on screen, so a close neighbour still shows one and a far one doesn't cross the map.
+    mctx.strokeStyle = "rgba(226,196,158,0.6)"; mctx.setLineDash([2, 4]); mctx.lineWidth = 1.1;
+    for (const [from, to] of storyStarts()) {
       const e = edgeKey("thread", from.id, to.id), fwd = e.a === from.id;
-      mctx.strokeStyle = "rgba(226,196,158,0.5)"; mctx.setLineDash([2, 4]);
-      each(e, (ax, ay, bx, by) => strokeCurve(ax, ay, bx, by, LINE_STYLE.thread.bend, fwd ? 0 : 0.6, fwd ? 0.4 : 1));
+      each(e, (ax, ay, bx, by) => {
+        const len = Math.hypot(bx - ax, by - ay) || 1, f = Math.min(1, clamp(0.3 * len, 22, 64) / len);
+        strokeCurve(ax, ay, bx, by, LINE_STYLE.thread.bend, fwd ? 0 : 1 - f, fwd ? f : 1);
+      });
     }
     mctx.setLineDash([]);
     // after the finale: the whole route draws itself once, brighter, then settles
